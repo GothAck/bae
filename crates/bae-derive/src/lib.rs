@@ -13,6 +13,7 @@
 extern crate proc_macro;
 
 use heck::SnakeCase;
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use proc_macro_error::*;
 use quote::*;
@@ -29,13 +30,27 @@ pub fn from_attributes(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 #[derive(Debug)]
 struct FromAttributes {
     item: ItemStruct,
+    attr_name: LitStr,
+    fields: IndexMap<Ident, FromAttributesField>,
     tokens: TokenStream,
 }
 
 impl FromAttributes {
     fn new(item: ItemStruct) -> Self {
+        let attr_name = LitStr::new(&item.ident.to_string().to_snake_case(), item.ident.span());
+        let fields = item
+            .fields
+            .iter()
+            .map(|field| {
+                let field = FromAttributesField::new(field, &attr_name);
+                (field.ident.clone(), field)
+            })
+            .collect();
+
         Self {
             item,
+            attr_name,
+            fields,
             tokens: TokenStream::new(),
         }
     }
@@ -55,15 +70,9 @@ impl FromAttributes {
         &self.item.ident
     }
 
-    fn attr_name(&self) -> LitStr {
-        let struct_name = self.struct_name();
-        let name = struct_name.to_string().to_snake_case();
-        LitStr::new(&name, struct_name.span())
-    }
-
     fn expand_from_attributes_method(&mut self) {
         let struct_name = self.struct_name();
-        let attr_name = self.attr_name();
+        let attr_name = &self.attr_name;
 
         let code = quote! {
             impl #struct_name {
@@ -100,65 +109,31 @@ impl FromAttributes {
 
     fn expand_parse_impl(&mut self) {
         let struct_name = self.struct_name();
-        let attr_name = self.attr_name();
+        let attr_name = &self.attr_name;
 
-        let variable_declarations = self.item.fields.iter().map(|field| {
-            let name = &field.ident;
-            quote! { let mut #name = std::option::Option::None; }
-        });
+        let variable_declarations = self
+            .fields
+            .values()
+            .map(FromAttributesField::expand_variable_decl);
 
-        let match_arms = self.item.fields.iter().map(|field| {
-            let field_name = get_field_name(field);
-            let pattern = LitStr::new(&field_name.to_string(), field.span());
-
-            if field_is_switch(field) {
-                quote! {
-                    #pattern => {
-                        #field_name = std::option::Option::Some(());
-                    }
-                }
-            } else {
-                quote! {
-                    #pattern => {
-                        content.parse::<syn::Token![=]>()?;
-                        #field_name = std::option::Option::Some(content.parse()?);
-                    }
-                }
-            }
-        });
+        let match_arms = self
+            .fields
+            .values()
+            .map(FromAttributesField::expand_match_arms);
 
         let unwrap_mandatory_fields = self
-            .item
             .fields
-            .iter()
-            .filter(|field| !field_is_optional(field))
-            .map(|field| {
-                let field_name = get_field_name(field);
-                let arg_name = LitStr::new(&field_name.to_string(), field.span());
+            .values()
+            .filter_map(FromAttributesField::expand_unwrap_mandatory_field);
 
-                quote! {
-                    let #field_name = if let std::option::Option::Some(#field_name) = #field_name {
-                        #field_name
-                    } else {
-                        return syn::Result::Err(
-                            input.error(
-                                &format!("`#[{}]` is missing `{}` argument", #attr_name, #arg_name),
-                            )
-                        );
-                    };
-                }
-            });
-
-        let set_fields = self.item.fields.iter().map(|field| {
-            let field_name = get_field_name(field);
-            quote! { #field_name, }
-        });
+        let set_fields = self
+            .fields
+            .values()
+            .map(FromAttributesField::expand_set_field);
 
         let mut supported_args = self
-            .item
             .fields
-            .iter()
-            .map(|field| get_field_name(field))
+            .keys()
             .map(|field_name| format!("`{}`", field_name))
             .collect::<Vec<_>>();
         supported_args.sort_unstable();
@@ -206,67 +181,135 @@ impl FromAttributes {
     }
 }
 
-fn get_field_name(field: &Field) -> &Ident {
-    field
-        .ident
-        .as_ref()
-        .unwrap_or_else(|| abort!(field.span(), "Field without a name"))
+#[derive(Debug)]
+struct FromAttributesField {
+    field: Field,
+    attr_name: LitStr,
+    ident: Ident,
 }
 
-fn field_is_optional(field: &Field) -> bool {
-    let type_path = if let Type::Path(type_path) = &field.ty {
-        type_path
-    } else {
-        return false;
-    };
+impl FromAttributesField {
+    fn new(field: &Field, attr_name: &LitStr) -> Self {
+        let ident = field
+            .ident
+            .clone()
+            .unwrap_or_else(|| abort!(field.span(), "Field without a name"));
 
-    let ident = &type_path
-        .path
-        .segments
-        .last()
-        .unwrap_or_else(|| abort!(field.span(), "Empty type path"))
-        .ident;
+        Self {
+            field: field.clone(),
+            attr_name: attr_name.clone(),
+            ident,
+        }
+    }
 
-    ident == "Option"
-}
+    fn expand_variable_decl(&self) -> TokenStream {
+        let name = &self.ident;
+        quote! { let mut #name = std::option::Option::None; }
+    }
 
-fn field_is_switch(field: &Field) -> bool {
-    let unit_type = syn::parse_str::<Type>("()").unwrap();
-    inner_type(&field.ty) == Some(&unit_type)
-}
+    fn expand_match_arms(&self) -> TokenStream {
+        let field_name = &self.ident;
+        let pattern = LitStr::new(&field_name.to_string(), self.field.span());
 
-fn inner_type(ty: &Type) -> Option<&Type> {
-    let type_path = if let Type::Path(type_path) = ty {
-        type_path
-    } else {
-        return None;
-    };
+        if self.is_switch() {
+            quote! {
+                #pattern => {
+                    #field_name = std::option::Option::Some(());
+                }
+            }
+        } else {
+            quote! {
+                #pattern => {
+                    content.parse::<syn::Token![=]>()?;
+                    #field_name = std::option::Option::Some(content.parse()?);
+                }
+            }
+        }
+    }
 
-    let ty_args = &type_path
-        .path
-        .segments
-        .last()
-        .unwrap_or_else(|| abort!(ty.span(), "Empty type path"))
-        .arguments;
+    fn expand_unwrap_mandatory_field(&self) -> Option<TokenStream> {
+        if self.is_optional() {
+            None
+        } else {
+            let field_name = &self.ident;
+            let attr_name = &self.attr_name;
+            let arg_name = LitStr::new(&field_name.to_string(), self.field.span());
 
-    let ty_args = if let PathArguments::AngleBracketed(ty_args) = ty_args {
-        ty_args
-    } else {
-        return None;
-    };
+            Some(quote! {
+                let #field_name = if let std::option::Option::Some(#field_name) = #field_name {
+                    #field_name
+                } else {
+                    return syn::Result::Err(
+                        input.error(
+                            &format!("`#[{}]` is missing `{}` argument", #attr_name, #arg_name),
+                        )
+                    );
+                };
+            })
+        }
+    }
 
-    let generic_arg = &ty_args
-        .args
-        .last()
-        .unwrap_or_else(|| abort!(ty_args.span(), "Empty generic argument"));
+    fn expand_set_field(&self) -> TokenStream {
+        let field_name = &self.ident;
+        quote! { #field_name, }
+    }
 
-    let ty = if let GenericArgument::Type(ty) = generic_arg {
-        ty
-    } else {
-        return None;
-    };
+    fn is_switch(&self) -> bool {
+        let unit_type = syn::parse_str::<Type>("()").unwrap();
+        self.inner_type() == Some(&unit_type)
+    }
 
-    Some(ty)
+    fn is_optional(&self) -> bool {
+        let type_path = if let Type::Path(type_path) = &self.field.ty {
+            type_path
+        } else {
+            return false;
+        };
+
+        let ident = &type_path
+            .path
+            .segments
+            .last()
+            .unwrap_or_else(|| abort!(self.field.span(), "Empty type path"))
+            .ident;
+
+        ident == "Option"
+    }
+
+    fn inner_type(&self) -> Option<&Type> {
+        let ty = &self.field.ty;
+        let type_path = if let Type::Path(type_path) = ty {
+            type_path
+        } else {
+            return None;
+        };
+
+        let ty_args = &type_path
+            .path
+            .segments
+            .last()
+            .unwrap_or_else(|| abort!(ty.span(), "Empty type path"))
+            .arguments;
+
+        let ty_args = if let PathArguments::AngleBracketed(ty_args) = ty_args {
+            ty_args
+        } else {
+            return None;
+        };
+
+        let generic_arg = &ty_args
+            .args
+            .last()
+            .unwrap_or_else(|| abort!(ty_args.span(), "Empty generic argument"));
+
+        let ty = if let GenericArgument::Type(ty) = generic_arg {
+            ty
+        } else {
+            return None;
+        };
+
+        Some(ty)
+    }
 }
 
 #[cfg(test)]

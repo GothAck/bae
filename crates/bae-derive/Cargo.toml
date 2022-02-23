@@ -13,6 +13,7 @@ repository = "https://github.com/davidpdrsn/bae.git"
 version = "0.1.7"
 
 [dependencies]
+indexmap = "1.8"
 syn = { version = "1", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
