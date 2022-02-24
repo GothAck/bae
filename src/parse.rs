@@ -1,12 +1,11 @@
 use proc_macro2::Ident;
 use syn::{
     parse::{Parse, ParseStream},
+    spanned::Spanned,
     Result,
 };
 
 use syn::{Error, LitFloat, LitInt, LitStr};
-
-use crate::types_support::BaeSupportedSynType;
 
 /// Parsing interface implemented by all types that can be parsed in a default way by a `FromAttribute` implementation.
 ///
@@ -38,6 +37,39 @@ where
     /// Parse the `input` `ParseStream` like a function argument (e.g. for `Option<u8>` take ident("None") to be None, and Some("123") to be Some(LitStr("123")))
     fn parse_fn_arg(input: ParseStream) -> Result<Self> {
         <Self as BaeParse>::parse(input)
+    }
+}
+
+/// Parsing interface implemented by types that
+pub trait BaeParseVia
+where
+    Self: Sized,
+{
+    /// Parse 'via' this type
+    type Via: Parse + Spanned;
+
+    /// Try conversion from `Self::Via` to `Self`
+    fn try_via(via: Self::Via) -> Result<Self>;
+}
+
+impl<T: BaeParseVia> BaeParse for T
+where
+    Self: BaeParseVia,
+    <Self as BaeParseVia>::Via: BaeParse,
+{
+    fn parse(input: ParseStream) -> Result<Self> {
+        let via = <<Self as BaeParseVia>::Via as BaeParse>::parse(input)?;
+        <Self as BaeParseVia>::try_via(via)
+    }
+
+    fn parse_prefix(input: ParseStream) -> Result<Self> {
+        let via = <<Self as BaeParseVia>::Via as BaeParse>::parse_prefix(input)?;
+        <Self as BaeParseVia>::try_via(via)
+    }
+
+    fn parse_fn_arg(input: ParseStream) -> Result<Self> {
+        let via = <<Self as BaeParseVia>::Via as BaeParse>::parse_fn_arg(input)?;
+        <Self as BaeParseVia>::try_via(via)
     }
 }
 
@@ -78,48 +110,57 @@ where
     }
 }
 
-impl BaeParse for String {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let lit_str = <LitStr as BaeParse>::parse(input)?;
-        Ok(lit_str.value())
+impl BaeParseVia for String {
+    type Via = LitStr;
+
+    fn try_via(via: Self::Via) -> Result<Self> {
+        Ok(via.value())
     }
 }
 
-impl<T> BaeParse for T
-where
-    T: Parse + BaeSupportedSynType,
-{
-    fn parse(input: ParseStream) -> Result<Self> {
-        <Self as Parse>::parse(input)
-    }
+macro_rules! impl_bae_parse_syn_type {
+    ($x:ty) => {
+        impl BaeParse for $x
+        where
+            Self: Parse + BaeSupportedSynType,
+        {
+            fn parse(input: ParseStream) -> Result<Self> {
+                <Self as Parse>::parse(input)
+            }
+        }
+    };
 }
 
-macro_rules! impl_bae_parse_integer_types {
+pub(crate) use impl_bae_parse_syn_type;
+
+macro_rules! impl_bae_parse_via_integer_types {
     ($($x:ty),+) => (
         $(
-            impl BaeParse for $x {
-                fn parse(input: ParseStream) -> Result<Self> {
-                    let lit_int = <LitInt as BaeParse>::parse(input)?;
-                    lit_int.base10_parse()
+            impl BaeParseVia for $x {
+                type Via = LitInt;
+
+                fn try_via(via: Self::Via) -> Result<Self> {
+                    via.base10_parse()
                 }
             }
         )+
     );
 }
 
-impl_bae_parse_integer_types!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
+impl_bae_parse_via_integer_types!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
 
-macro_rules! impl_bae_parse_float_types {
+macro_rules! impl_bae_parse_via_float_types {
     ($($x:ty),+) => (
         $(
-            impl BaeParse for $x {
-                fn parse(input: ParseStream) -> Result<Self> {
-                    let lit_int = <LitFloat as BaeParse>::parse(input)?;
-                    lit_int.base10_parse()
+            impl BaeParseVia for $x {
+                type Via = LitFloat;
+
+                fn try_via(via: Self::Via) -> Result<Self> {
+                    via.base10_parse()
                 }
             }
         )+
     );
 }
 
-impl_bae_parse_float_types!(f32, f64);
+impl_bae_parse_via_float_types!(f32, f64);

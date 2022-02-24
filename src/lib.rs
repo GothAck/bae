@@ -111,8 +111,11 @@ pub use bae_derive::FromAttributes;
 
 pub use self::{
     default::{BaeDefault, BaeDefaultedValue},
-    parse::BaeParse,
-    wrappers::fncall::{FnCallFixed, FnCallVarArgs},
+    parse::{BaeParse, BaeParseVia},
+    wrappers::{
+        fncall::{FnCallFixed, FnCallVarArgs},
+        spanned_value::SpannedValue,
+    },
 };
 
 #[cfg(test)]

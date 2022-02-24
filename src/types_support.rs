@@ -1,6 +1,9 @@
 //! Types supported by `bae`'s `BaeParser` trait
 
-use syn::parse::Parse;
+use syn::{
+    parse::{Parse, ParseStream},
+    Result,
+};
 
 use syn::{
     BinOp, Expr, ExprArray, ExprAssign, ExprAssignOp, ExprBinary, ExprCall, ExprCast, ExprClosure,
@@ -12,7 +15,7 @@ use syn::{
     UnOp, Visibility,
 };
 
-use crate::{BaeDefault, BaeParse};
+use crate::{parse::impl_bae_parse_syn_type, BaeDefault, BaeParse};
 
 /// Implemented for `syn` types `bae` supports parsing
 pub trait BaeSupportedSynType {}
@@ -37,6 +40,8 @@ macro_rules! impl_bae_supported_syn_types {
                 Self: Parse,
             {}
             impl BaeSupportedTypeChecked for $x {}
+
+            impl_bae_parse_syn_type!($x);
         )+
     );
 }
@@ -111,7 +116,7 @@ impl_bae_supported_syn_types!(
 );
 
 impl_bae_supported_other_types!(
-    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64
+    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64, String
 );
 
 pub(crate) use impl_bae_supported_other_types;
