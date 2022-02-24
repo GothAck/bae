@@ -1,9 +1,10 @@
+use proc_macro2::Ident;
 use syn::{
     parse::{Parse, ParseStream},
     Result,
 };
 
-use syn::{LitFloat, LitInt, LitStr};
+use syn::{Error, LitFloat, LitInt, LitStr};
 
 use crate::types_support::BaeSupportedSynType;
 
@@ -33,6 +34,11 @@ where
         input.parse::<syn::Token![=]>()?;
         <Self as BaeParse>::parse(input)
     }
+
+    /// Parse the `input` `ParseStream` like a function argument (e.g. for `Option<u8>` take ident("None") to be None, and Some("123") to be Some(LitStr("123")))
+    fn parse_fn_arg(input: ParseStream) -> Result<Self> {
+        <Self as BaeParse>::parse(input)
+    }
 }
 
 impl BaeParse for () {
@@ -55,6 +61,20 @@ where
 
     fn parse_prefix(input: ParseStream) -> Result<Self> {
         Ok(Some(<T as BaeParse>::parse_prefix(input)?))
+    }
+
+    fn parse_fn_arg(input: ParseStream) -> Result<Self> {
+        let variant_name = input.parse::<Ident>()?;
+        match variant_name.to_string().as_str() {
+            "None" => Ok(None),
+            "Some" => {
+                let content;
+                syn::parenthesized!(content in input);
+                let inner = T::parse_fn_arg(&content)?;
+                Ok(Some(inner))
+            }
+            _ => Err(Error::new(input.span(), "Invalid Option variant")),
+        }
     }
 }
 

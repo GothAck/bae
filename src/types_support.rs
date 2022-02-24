@@ -22,6 +22,8 @@ pub trait BaeSupportedOtherType {}
 pub trait BaeSupportedAllType {}
 /// Implemented for all types that should support `BaeParse` and `BaeDefault`
 pub trait BaeSupportedTypeChecked: BaeParse + BaeDefault {}
+/// Implemented by types that specifically do not implement both BaeParse + BaeDefault
+pub trait BaeSupportedTypeBunked {}
 
 macro_rules! impl_bae_supported_syn_types {
     ($($x:ty),+) => (

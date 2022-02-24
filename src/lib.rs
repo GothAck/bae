@@ -105,12 +105,14 @@
 mod default;
 mod parse;
 pub mod types_support;
+mod wrappers;
 
 pub use bae_derive::FromAttributes;
 
 pub use self::{
     default::{BaeDefault, BaeDefaultedValue},
     parse::BaeParse,
+    wrappers::fncall::{FnCallFixed, FnCallVarArgs},
 };
 
 #[cfg(test)]
