@@ -14,11 +14,11 @@ version = "0.1.7"
 
 [dependencies]
 bae-derive = { version = "0.1.7", path = "crates/bae-derive" }
+syn = { version = "1", features = ["full", "extra-traits"] }
+proc-macro2 = { version = "1" }
 
 [dev-dependencies]
-syn = { version = "1", features = ["full", "extra-traits"] }
 quote = "1"
-proc-macro2 = "1"
 proc-macro-error = "1"
 trybuild = "1"
 

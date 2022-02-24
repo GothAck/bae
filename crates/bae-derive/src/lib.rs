@@ -209,19 +209,19 @@ impl FromAttributesField {
 
     fn expand_match_arms(&self) -> TokenStream {
         let field_name = &self.ident;
+        let ty = &self.field.ty;
         let pattern = LitStr::new(&field_name.to_string(), self.field.span());
 
-        if self.is_switch() {
+        if self.is_optional() {
             quote! {
                 #pattern => {
-                    #field_name = std::option::Option::Some(());
+                    #field_name = <#ty as ::bae::BaeParse>::parse_prefix(&content)?;
                 }
             }
         } else {
             quote! {
                 #pattern => {
-                    content.parse::<syn::Token![=]>()?;
-                    #field_name = std::option::Option::Some(content.parse()?);
+                    #field_name = Some(<#ty as ::bae::BaeParse>::parse_prefix(&content)?);
                 }
             }
         }
@@ -254,11 +254,6 @@ impl FromAttributesField {
         quote! { #field_name, }
     }
 
-    fn is_switch(&self) -> bool {
-        let unit_type = syn::parse_str::<Type>("()").unwrap();
-        self.inner_type() == Some(&unit_type)
-    }
-
     fn is_optional(&self) -> bool {
         let type_path = if let Type::Path(type_path) = &self.field.ty {
             type_path
@@ -274,41 +269,6 @@ impl FromAttributesField {
             .ident;
 
         ident == "Option"
-    }
-
-    fn inner_type(&self) -> Option<&Type> {
-        let ty = &self.field.ty;
-        let type_path = if let Type::Path(type_path) = ty {
-            type_path
-        } else {
-            return None;
-        };
-
-        let ty_args = &type_path
-            .path
-            .segments
-            .last()
-            .unwrap_or_else(|| abort!(ty.span(), "Empty type path"))
-            .arguments;
-
-        let ty_args = if let PathArguments::AngleBracketed(ty_args) = ty_args {
-            ty_args
-        } else {
-            return None;
-        };
-
-        let generic_arg = &ty_args
-            .args
-            .last()
-            .unwrap_or_else(|| abort!(ty_args.span(), "Empty generic argument"));
-
-        let ty = if let GenericArgument::Type(ty) = generic_arg {
-            ty
-        } else {
-            return None;
-        };
-
-        Some(ty)
     }
 }
 

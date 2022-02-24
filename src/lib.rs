@@ -102,7 +102,11 @@
     missing_docs
 )]
 
+mod parse;
+
 pub use bae_derive::FromAttributes;
+
+pub use self::parse::BaeParse;
 
 #[cfg(test)]
 mod test {
