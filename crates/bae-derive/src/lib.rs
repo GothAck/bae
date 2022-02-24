@@ -12,234 +12,87 @@
 
 extern crate proc_macro;
 
-use heck::SnakeCase;
-use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use proc_macro_error::*;
-use quote::*;
-use syn::{spanned::Spanned, *};
+use quote::quote;
+use syn::{parse_macro_input, Attribute, ItemStruct, Result};
+
+use bae_common::from_attributes_meta::{
+    FromAttributesData, FromAttributesFieldData, FromAttributesMeta,
+};
 
 /// See root module docs for more info.
-#[proc_macro_derive(FromAttributes, attributes())]
+#[proc_macro_derive(FromAttributes, attributes(bae))]
 #[proc_macro_error]
 pub fn from_attributes(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
-    FromAttributes::new(item).expand().into()
+    FromAttributesMeta::<Data, FieldData, false>::new(item)
+        .expand()
+        .into()
 }
 
-#[derive(Debug)]
-struct FromAttributes {
-    item: ItemStruct,
-    attr_name: LitStr,
-    fields: IndexMap<Ident, FromAttributesField>,
-    tokens: TokenStream,
-}
+mod structs {
+    use proc_macro2::Ident;
 
-impl FromAttributes {
-    fn new(item: ItemStruct) -> Self {
-        let attr_name = LitStr::new(&item.ident.to_string().to_snake_case(), item.ident.span());
-        let fields = item
-            .fields
-            .iter()
-            .map(|field| {
-                let field = FromAttributesField::new(field, &attr_name);
-                (field.ident.clone(), field)
-            })
-            .collect();
+    use bae_derive_meta::FromAttributesInception;
 
-        Self {
-            item,
-            attr_name,
-            fields,
-            tokens: TokenStream::new(),
-        }
-    }
-
-    fn expand(mut self) -> TokenStream {
-        self.expand_from_attributes_method();
-        self.expand_parse_impl();
-
-        if std::env::var("BAE_DEBUG").is_ok() {
-            eprintln!("{}", self.tokens);
-        }
-
-        self.tokens
-    }
-
-    fn struct_name(&self) -> &Ident {
-        &self.item.ident
-    }
-
-    fn expand_from_attributes_method(&mut self) {
-        let struct_name = self.struct_name();
-        let attr_name = &self.attr_name;
-
-        let code = quote! {
-            impl #struct_name {
-                pub fn try_from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Option<Self>> {
-                    use syn::spanned::Spanned;
-
-                    for attr in attrs {
-                        match attr.path.get_ident() {
-                            Some(ident) if ident == #attr_name => {
-                                return Some(syn::parse2::<Self>(attr.tokens.clone())).transpose()
-                            }
-                            // Ignore other attributes
-                            _ => {},
-                        }
-                    }
-
-                    Ok(None)
-                }
-
-                pub fn from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self> {
-                    if let Some(attr) = Self::try_from_attributes(attrs)? {
-                        Ok(attr)
-                    } else {
-                        Err(syn::Error::new(
-                            proc_macro2::Span::call_site(),
-                            &format!("missing attribute `#[{}]`", #attr_name),
-                        ))
-                    }
-                }
-            }
-        };
-        self.tokens.extend(code);
-    }
-
-    fn expand_parse_impl(&mut self) {
-        let struct_name = self.struct_name();
-        let attr_name = &self.attr_name;
-
-        let variable_declarations = self
-            .fields
-            .values()
-            .map(FromAttributesField::expand_variable_decl);
-
-        let match_arms = self
-            .fields
-            .values()
-            .map(FromAttributesField::expand_match_arms);
-
-        let unwrap_mandatory_fields = self
-            .fields
-            .values()
-            .filter_map(FromAttributesField::expand_unwrap_mandatory_field);
-
-        let set_fields = self
-            .fields
-            .values()
-            .map(FromAttributesField::expand_set_field);
-
-        let mut supported_args = self
-            .fields
-            .keys()
-            .map(|field_name| format!("`{}`", field_name))
-            .collect::<Vec<_>>();
-        supported_args.sort_unstable();
-        let supported_args = supported_args.join(", ");
-
-        let code = quote! {
-            impl syn::parse::Parse for #struct_name {
-                #[allow(unreachable_code, unused_imports, unused_variables)]
-                fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-                    #(#variable_declarations)*
-
-                    let content;
-                    syn::parenthesized!(content in input);
-                    let content_span = content.span();
-
-                    while !content.is_empty() {
-                        let bae_attr_ident = content.parse::<syn::Ident>()?;
-
-                        match &*bae_attr_ident.to_string() {
-                            #(#match_arms)*
-                            other => {
-                                return syn::Result::Err(
-                                    syn::Error::new(
-                                        bae_attr_ident.span(),
-                                        &format!(
-                                            "`#[{}]` got unknown `{}` argument. Supported arguments are {}",
-                                            #attr_name,
-                                            other,
-                                            #supported_args,
-                                        ),
-                                    )
-                                );
-                            }
-                        }
-
-                        content.parse::<syn::Token![,]>().ok();
-                    }
-
-                    #(#unwrap_mandatory_fields)*
-
-                    syn::Result::Ok(Self { #(#set_fields)* })
-                }
-            }
-        };
-        self.tokens.extend(code);
+    #[derive(FromAttributesInception, Debug, Default)]
+    pub struct Bae {
+        pub name: Option<Ident>,
     }
 }
 
-#[derive(Debug)]
-struct FromAttributesField {
-    field: Field,
-    attr_name: LitStr,
-    ident: Ident,
+mod fields {
+    use proc_macro2::Ident;
+
+    use bae_derive_meta::FromAttributesInception;
+    use syn::Path;
+
+    #[derive(FromAttributesInception, Debug, Default)]
+    pub struct Bae {
+        pub name: Option<Ident>,
+        pub skip: Option<()>,
+        pub default: Option<Path>,
+    }
 }
 
-impl FromAttributesField {
-    fn new(field: &Field, attr_name: &LitStr) -> Self {
-        let ident = field
-            .ident
-            .clone()
-            .unwrap_or_else(|| abort!(field.span(), "Field without a name"));
+struct Data(structs::Bae);
 
-        Self {
-            field: field.clone(),
-            attr_name: attr_name.clone(),
-            ident,
-        }
+impl FromAttributesData for Data {
+    fn new(attrs: &[Attribute]) -> Result<Self> {
+        Ok(Data(
+            structs::Bae::try_from_attributes(attrs)?.unwrap_or_default(),
+        ))
     }
-
-    fn expand_variable_decl(&self) -> TokenStream {
-        let name = &self.ident;
-        let ty = &self.field.ty;
-        quote! { let mut #name: Option<#ty> = std::option::Option::None; }
+    fn rename_attr_name(&self, original: String) -> String {
+        self.0
+            .name
+            .as_ref()
+            .map(|name| name.to_string())
+            .unwrap_or(original)
     }
+}
 
-    fn expand_match_arms(&self) -> TokenStream {
-        let field_name = &self.ident;
-        let ty = &self.field.ty;
-        let pattern = LitStr::new(&field_name.to_string(), self.field.span());
+struct FieldData(fields::Bae);
 
-        return quote! {
-            #pattern => {
-                #field_name = Some(<#ty as ::bae::BaeParse>::parse_prefix(&content)?);
-            }
-        };
+impl FromAttributesFieldData for FieldData {
+    fn new(attrs: &[Attribute]) -> Result<Self> {
+        Ok(FieldData(
+            fields::Bae::try_from_attributes(attrs)?.unwrap_or_default(),
+        ))
     }
-
-    fn expand_unwrap_mandatory_field(&self) -> Option<TokenStream> {
-        let attr_name = &self.attr_name;
-        let field_name = &self.ident;
-        let arg_name = LitStr::new(&field_name.to_string(), self.field.span());
-
-        Some(quote! {
-            let #field_name = #field_name
-                .map(|v| ::bae::BaeDefaultedValue::Present(v))
-                .unwrap_or_else(<_ as ::bae::BaeDefault>::bae_default)
-                .ok_or_syn_error(
-                    content_span,
-                    &format!("`#[{}]` is missing `{}` argument", #attr_name, #arg_name),
-                )?;
-        })
+    fn rename_field_name(&self, original: String) -> String {
+        self.0
+            .name
+            .as_ref()
+            .map(|name| name.to_string())
+            .unwrap_or(original)
     }
-
-    fn expand_set_field(&self) -> TokenStream {
-        let field_name = &self.ident;
-        quote! { #field_name, }
+    fn skip(&self) -> bool {
+        self.0.skip.is_some()
+    }
+    fn default(&self) -> Option<TokenStream> {
+        self.0.default.as_ref().map(|default| quote! { #default })
     }
 }
 
