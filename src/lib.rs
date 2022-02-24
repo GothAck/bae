@@ -102,20 +102,11 @@
     missing_docs
 )]
 
-mod default;
-mod parse;
-pub mod types_support;
-mod wrappers;
-
 pub use bae_derive::FromAttributes;
 
-pub use self::{
-    default::{BaeDefault, BaeDefaultedValue},
-    parse::{BaeParse, BaeParseVia},
-    wrappers::{
-        fncall::{FnCallFixed, FnCallVarArgs},
-        spanned_value::SpannedValue,
-    },
+pub use bae_common::{
+    types_support, BaeDefault, BaeDefaultedValue, BaeParse, BaeParseVia, FnCallFixed,
+    FnCallVarArgs, SpannedValue,
 };
 
 #[cfg(test)]
