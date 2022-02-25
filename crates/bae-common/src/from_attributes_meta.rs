@@ -253,10 +253,19 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
 
         let ident = &self.ident;
         let pattern = &self.field_name;
+        let attr_name = &self.attr_name;
+        let field_name = &self.field_name;
         let bae_path = &self.bae_path;
 
         Some(quote! {
             #pattern => {
+                if #ident.is_some() {
+                    return Err(::syn::Error::new(
+                        content_span,
+                        &format!("`#[{}]` argument `{}` specified multiple times", #attr_name, #field_name),
+                    ));
+                }
+
                 #ident = Some(<_ as #bae_path::BaeParse>::parse_prefix(&content)?);
             }
         })
