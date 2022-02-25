@@ -15,6 +15,9 @@ mod default;
 #[doc(hidden)]
 pub mod from_attributes_meta;
 mod parse;
+#[doc(hidden)]
+pub mod private;
+
 pub mod types_support;
 mod wrappers;
 

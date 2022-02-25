@@ -31,6 +31,7 @@ pub struct FromAttributesMeta<
     const COMMON: bool,
 > {
     item: ItemStruct,
+    bae_path: Path,
     #[allow(dead_code)] // FIXME: remove dead_code
     data: Data,
     attr_name: LitStr,
@@ -66,6 +67,7 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
 
         Ok(Self {
             item,
+            bae_path,
             data,
             attr_name,
             fields,
@@ -90,24 +92,46 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
 
     fn expand_from_attributes_method(&mut self) {
         let struct_name = self.struct_name();
+        let bae_path = &self.bae_path;
         let attr_name = &self.attr_name;
 
         let code = quote! {
             impl #struct_name {
                 pub fn try_from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Option<Self>> {
-                    use syn::spanned::Spanned;
+                    use ::syn::spanned::Spanned;
+                    use ::proc_macro2::Span;
+                    use #bae_path::private::IterCombineSynErrors;
 
-                    for attr in attrs {
-                        match attr.path.get_ident() {
+                    let attrs = attrs
+                        .iter()
+                        .filter_map(|attr| match attr.path.get_ident() {
                             Some(ident) if ident == #attr_name => {
-                                return Some(syn::parse2::<Self>(attr.tokens.clone())).transpose()
-                            }
-                            // Ignore other attributes
-                            _ => {},
-                        }
-                    }
+                                Some(
+                                    ::syn::parse2::<Self>(attr.tokens.clone())
+                                        .map(|parsed| (parsed, attr.span()))
+                                )
+                            },
+                            _ => None,
+                        })
+                        .collect_syn_error::<Vec<_>>()?;
 
-                    Ok(None)
+                    attrs
+                        .into_iter()
+                        .fold(Ok(None), |accum, (attr, span)| {
+                            let error_new = || syn::Error::new(
+                                span,
+                                &format!("duplicate attribute `#[{}]`", #attr_name),
+                            );
+
+                            match accum {
+                                Ok(None) => Ok(Some(attr)),
+                                Ok(Some(..)) => Err(error_new()),
+                                Err(mut error) => {
+                                    error.combine(error_new());
+                                    Err(error)
+                                }
+                            }
+                        })
                 }
 
                 pub fn from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self> {
