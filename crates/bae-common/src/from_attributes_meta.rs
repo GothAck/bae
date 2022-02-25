@@ -3,7 +3,6 @@ extern crate proc_macro;
 use heck::ToSnakeCase;
 use indexmap::IndexMap;
 use proc_macro2::TokenStream;
-use proc_macro_error::*;
 use quote::*;
 use syn::{spanned::Spanned, *};
 
@@ -42,15 +41,15 @@ pub struct FromAttributesMeta<
 impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON: bool>
     FromAttributesMeta<Data, FieldData, COMMON>
 {
-    pub fn new(item: ItemStruct) -> Self {
+    pub fn new(item: ItemStruct) -> Result<Self> {
         let bae_path = {
             if COMMON {
-                parse_str("::bae_common").unwrap()
+                parse_str("::bae_common")?
             } else {
-                parse_str("::bae").unwrap()
+                parse_str("::bae")?
             }
         };
-        let data = Data::new(&item.attrs).unwrap();
+        let data = Data::new(&item.attrs)?;
         let attr_name = {
             let attr_name = item.ident.to_string().to_snake_case();
             let attr_name = data.rename_attr_name(attr_name);
@@ -60,18 +59,18 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
             .fields
             .iter()
             .map(|field| {
-                let field = FromAttributesFieldMeta::new(field, &attr_name, &bae_path);
-                (field.ident.clone(), field)
+                let field = FromAttributesFieldMeta::new(field, &attr_name, &bae_path)?;
+                Ok((field.ident.clone(), field))
             })
-            .collect();
+            .collect::<Result<IndexMap<_, _>>>()?;
 
-        Self {
+        Ok(Self {
             item,
             data,
             attr_name,
             fields,
             tokens: TokenStream::new(),
-        }
+        })
     }
 
     pub fn expand(mut self) -> TokenStream {
@@ -212,13 +211,13 @@ struct FromAttributesFieldMeta<FieldData: FromAttributesFieldData> {
 }
 
 impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
-    fn new(field: &Field, attr_name: &LitStr, bae_path: &Path) -> Self {
-        let data = FieldData::new(&field.attrs).unwrap();
+    fn new(field: &Field, attr_name: &LitStr, bae_path: &Path) -> Result<Self> {
+        let data = FieldData::new(&field.attrs)?;
 
         let ident = field
             .ident
             .clone()
-            .unwrap_or_else(|| abort!(field.span(), "Field without a name"));
+            .ok_or_else(|| Error::new(field.span(), "Field without a name"))?;
 
         let field_name = {
             let field_name = ident.to_string();
@@ -227,14 +226,14 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
             LitStr::new(&field_name, ident.span())
         };
 
-        Self {
+        Ok(Self {
             field: field.clone(),
             attr_name: attr_name.clone(),
             bae_path: bae_path.clone(),
             data,
             ident,
             field_name,
-        }
+        })
     }
 
     fn expand_variable_decl(&self) -> Option<TokenStream> {

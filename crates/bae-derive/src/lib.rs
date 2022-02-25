@@ -13,7 +13,6 @@
 extern crate proc_macro;
 
 use proc_macro2::TokenStream;
-use proc_macro_error::*;
 use quote::quote;
 use syn::{parse_macro_input, Attribute, ItemStruct, Result};
 
@@ -23,12 +22,16 @@ use bae_common::from_attributes_meta::{
 
 /// See root module docs for more info.
 #[proc_macro_derive(FromAttributes, attributes(bae))]
-#[proc_macro_error]
 pub fn from_attributes(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
-    FromAttributesMeta::<Data, FieldData, false>::new(item)
-        .expand()
-        .into()
+    match from_attributes_impl(item) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.into_compile_error().into(),
+    }
+}
+
+fn from_attributes_impl(item: ItemStruct) -> Result<TokenStream> {
+    Ok(FromAttributesMeta::<Data, FieldData, false>::new(item)?.expand())
 }
 
 mod structs {

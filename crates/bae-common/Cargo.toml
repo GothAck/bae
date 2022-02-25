@@ -19,7 +19,6 @@ paste = "1.0"
 
 indexmap = "1.8"
 quote = "1"
-proc-macro-error = "1"
 heck = "0.4"
 
 [lib]

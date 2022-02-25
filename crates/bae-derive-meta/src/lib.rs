@@ -1,5 +1,4 @@
 use proc_macro2::TokenStream;
-use proc_macro_error::proc_macro_error;
 use syn::{parse_macro_input, Attribute, ItemStruct, Result};
 
 use bae_common::from_attributes_meta::{
@@ -7,12 +6,16 @@ use bae_common::from_attributes_meta::{
 };
 
 #[proc_macro_derive(FromAttributesInception, attributes(bae))]
-#[proc_macro_error]
 pub fn from_attributes_inception(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
-    FromAttributesMeta::<Data, FieldData, true>::new(item)
-        .expand()
-        .into()
+    match from_attributes_inception_impl(item) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.into_compile_error().into(),
+    }
+}
+
+fn from_attributes_inception_impl(item: ItemStruct) -> Result<TokenStream> {
+    Ok(FromAttributesMeta::<Data, FieldData, true>::new(item)?.expand())
 }
 
 struct Data;
