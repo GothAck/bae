@@ -103,6 +103,7 @@
 )]
 
 mod parse;
+pub mod types_support;
 
 pub use bae_derive::FromAttributes;
 

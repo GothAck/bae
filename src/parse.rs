@@ -3,15 +3,9 @@ use syn::{
     Result,
 };
 
-use syn::{
-    BinOp, Expr, ExprArray, ExprAssign, ExprAssignOp, ExprBinary, ExprCall, ExprCast, ExprClosure,
-    ExprField, ExprIndex, ExprLit, ExprParen, ExprPath, ExprRange, ExprReference, ExprTry,
-    ExprTuple, ExprType, ExprUnary, GenericArgument, Ident, Index, Lifetime, Lit, LitBool, LitByte,
-    LitByteStr, LitChar, LitFloat, LitInt, LitStr, Meta, MetaList, MetaNameValue, NestedMeta, Path,
-    Type, TypeArray, TypeBareFn, TypeGroup, TypeImplTrait, TypeInfer, TypeMacro, TypeNever,
-    TypeParam, TypeParen, TypePath, TypePtr, TypeReference, TypeSlice, TypeTraitObject, TypeTuple,
-    UnOp, Visibility,
-};
+use syn::{LitFloat, LitInt, LitStr};
+
+use crate::types_support::BaeSupportedSynType;
 
 /// Parsing interface implemented by all types that can be parsed in a default way by a `FromAttribute` implementation.
 ///
@@ -71,77 +65,14 @@ impl BaeParse for String {
     }
 }
 
-macro_rules! impl_bae_parse_syn_types {
-    ($($x:ty),+) => (
-        $(
-            impl BaeParse for $x {
-                fn parse(input: ParseStream) -> Result<Self> {
-
-                    <Self as Parse>::parse(&input)
-                }
-            }
-        )+
-    );
+impl<T> BaeParse for T
+where
+    T: Parse + BaeSupportedSynType,
+{
+    fn parse(input: ParseStream) -> Result<Self> {
+        <Self as Parse>::parse(input)
+    }
 }
-
-impl_bae_parse_syn_types!(
-    Expr,
-    ExprArray,
-    ExprAssign,
-    ExprAssignOp,
-    ExprBinary,
-    ExprCall,
-    ExprCast,
-    ExprClosure,
-    ExprField,
-    ExprIndex,
-    ExprLit,
-    ExprParen,
-    ExprPath,
-    ExprRange,
-    ExprReference,
-    ExprTry,
-    ExprTuple,
-    ExprType,
-    ExprUnary,
-    Ident,
-    Lit,
-    LitBool,
-    LitByte,
-    LitByteStr,
-    LitChar,
-    LitFloat,
-    LitInt,
-    LitStr,
-    Index,
-    Lifetime,
-    Path,
-    Type,
-    TypeArray,
-    TypeBareFn,
-    // TypeGenerics // Disabled as it has a lifetime specifier
-    TypeGroup,
-    TypeImplTrait,
-    TypeInfer,
-    TypeMacro,
-    TypeNever,
-    TypeParam,
-    TypeParen,
-    TypePath,
-    TypePtr,
-    TypeReference,
-    TypeSlice,
-    TypeTraitObject,
-    TypeTuple,
-    Visibility,
-    BinOp,
-    GenericArgument,
-    Meta,
-    MetaList,
-    MetaNameValue,
-    NestedMeta,
-    UnOp
-);
 
 macro_rules! impl_bae_parse_integer_types {
     ($($x:ty),+) => (
