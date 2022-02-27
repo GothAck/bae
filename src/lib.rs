@@ -102,12 +102,16 @@
     missing_docs
 )]
 
+mod default;
 mod parse;
 pub mod types_support;
 
 pub use bae_derive::FromAttributes;
 
-pub use self::parse::BaeParse;
+pub use self::{
+    default::{BaeDefault, BaeDefaultedValue},
+    parse::BaeParse,
+};
 
 #[cfg(test)]
 mod test {

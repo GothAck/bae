@@ -12,7 +12,7 @@ use syn::{
     UnOp, Visibility,
 };
 
-use crate::BaeParse;
+use crate::{BaeDefault, BaeParse};
 
 /// Implemented for `syn` types `bae` supports parsing
 pub trait BaeSupportedSynType {}
@@ -20,8 +20,8 @@ pub trait BaeSupportedSynType {}
 pub trait BaeSupportedOtherType {}
 /// Implemented for all types `bae` supports parsing
 pub trait BaeSupportedAllType {}
-/// Implemented for all types that should support `BaeParse`
-pub trait BaeSupportedTypeChecked: BaeParse {}
+/// Implemented for all types that should support `BaeParse` and `BaeDefault`
+pub trait BaeSupportedTypeChecked: BaeParse + BaeDefault {}
 
 macro_rules! impl_bae_supported_syn_types {
     ($($x:ty),+) => (

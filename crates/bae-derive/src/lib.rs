@@ -147,6 +147,7 @@ impl FromAttributes {
 
                     let content;
                     syn::parenthesized!(content in input);
+                    let content_span = content.span();
 
                     while !content.is_empty() {
                         let bae_attr_ident = content.parse::<syn::Ident>()?;
@@ -204,7 +205,8 @@ impl FromAttributesField {
 
     fn expand_variable_decl(&self) -> TokenStream {
         let name = &self.ident;
-        quote! { let mut #name = std::option::Option::None; }
+        let ty = &self.field.ty;
+        quote! { let mut #name: Option<#ty> = std::option::Option::None; }
     }
 
     fn expand_match_arms(&self) -> TokenStream {
@@ -212,63 +214,32 @@ impl FromAttributesField {
         let ty = &self.field.ty;
         let pattern = LitStr::new(&field_name.to_string(), self.field.span());
 
-        if self.is_optional() {
-            quote! {
-                #pattern => {
-                    #field_name = <#ty as ::bae::BaeParse>::parse_prefix(&content)?;
-                }
+        return quote! {
+            #pattern => {
+                #field_name = Some(<#ty as ::bae::BaeParse>::parse_prefix(&content)?);
             }
-        } else {
-            quote! {
-                #pattern => {
-                    #field_name = Some(<#ty as ::bae::BaeParse>::parse_prefix(&content)?);
-                }
-            }
-        }
+        };
     }
 
     fn expand_unwrap_mandatory_field(&self) -> Option<TokenStream> {
-        if self.is_optional() {
-            None
-        } else {
-            let field_name = &self.ident;
-            let attr_name = &self.attr_name;
-            let arg_name = LitStr::new(&field_name.to_string(), self.field.span());
+        let attr_name = &self.attr_name;
+        let field_name = &self.ident;
+        let arg_name = LitStr::new(&field_name.to_string(), self.field.span());
 
-            Some(quote! {
-                let #field_name = if let std::option::Option::Some(#field_name) = #field_name {
-                    #field_name
-                } else {
-                    return syn::Result::Err(
-                        input.error(
-                            &format!("`#[{}]` is missing `{}` argument", #attr_name, #arg_name),
-                        )
-                    );
-                };
-            })
-        }
+        Some(quote! {
+            let #field_name = #field_name
+                .map(|v| ::bae::BaeDefaultedValue::Present(v))
+                .unwrap_or_else(<_ as ::bae::BaeDefault>::bae_default)
+                .ok_or_syn_error(
+                    content_span,
+                    &format!("`#[{}]` is missing `{}` argument", #attr_name, #arg_name),
+                )?;
+        })
     }
 
     fn expand_set_field(&self) -> TokenStream {
         let field_name = &self.ident;
         quote! { #field_name, }
-    }
-
-    fn is_optional(&self) -> bool {
-        let type_path = if let Type::Path(type_path) = &self.field.ty {
-            type_path
-        } else {
-            return false;
-        };
-
-        let ident = &type_path
-            .path
-            .segments
-            .last()
-            .unwrap_or_else(|| abort!(self.field.span(), "Empty type path"))
-            .ident;
-
-        ident == "Option"
     }
 }
 
