@@ -231,6 +231,7 @@ struct FromAttributesFieldMeta<FieldData: FromAttributesFieldData> {
     bae_path: Path,
     data: FieldData,
     ident: Ident,
+    variable_ident: Ident,
     field_name: LitStr,
 }
 
@@ -242,6 +243,8 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
             .ident
             .clone()
             .ok_or_else(|| Error::new(field.span(), "Field without a name"))?;
+
+        let variable_ident = format_ident!("___{}", ident);
 
         let field_name = {
             let field_name = ident.to_string();
@@ -256,6 +259,7 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
             bae_path: bae_path.clone(),
             data,
             ident,
+            variable_ident,
             field_name,
         })
     }
@@ -265,9 +269,9 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
             return None;
         }
 
-        let ident = &self.ident;
+        let variable_ident = &self.variable_ident;
         let ty = &self.field.ty;
-        Some(quote! { let mut #ident: Option<#ty> = std::option::Option::None; })
+        Some(quote! { let mut #variable_ident: Option<#ty> = std::option::Option::None; })
     }
 
     fn expand_match_arms(&self) -> Option<TokenStream> {
@@ -275,7 +279,7 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
             return None;
         }
 
-        let ident = &self.ident;
+        let variable_ident = &self.variable_ident;
         let pattern = &self.field_name;
         let attr_name = &self.attr_name;
         let field_name = &self.field_name;
@@ -283,20 +287,20 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
 
         Some(quote! {
             #pattern => {
-                if #ident.is_some() {
+                if #variable_ident.is_some() {
                     return Err(::syn::Error::new(
                         content_span,
                         &format!("`#[{}]` argument `{}` specified multiple times", #attr_name, #field_name),
                     ));
                 }
 
-                #ident = Some(<_ as #bae_path::BaeParse>::parse_prefix(&content)?);
+                #variable_ident = Some(<_ as #bae_path::BaeParse>::parse_prefix(&content)?);
             }
         })
     }
 
     fn expand_unwrap_mandatory_field(&self) -> TokenStream {
-        let ident = &self.ident;
+        let variable_ident = &self.variable_ident;
 
         if self.data.skip() {
             let ty = &self.field.ty;
@@ -307,7 +311,7 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
                 .unwrap_or_else(|| quote! { ::std::default::Default::default });
 
             quote! {
-                let #ident: #ty = #default();
+                let #variable_ident: #ty = #default();
             }
         } else {
             let bae_path = &self.bae_path;
@@ -321,7 +325,7 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
                 .unwrap_or_else(|| quote! { <_ as #bae_path::BaeDefault>::bae_default() });
 
             quote! {
-                let #ident = #ident
+                let #variable_ident = #variable_ident
                     .map(|v| #bae_path::BaeDefaultedValue::Present(v))
                     .unwrap_or_else(|| #default)
                     .ok_or_syn_error(
@@ -334,6 +338,8 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
 
     fn expand_set_field(&self) -> TokenStream {
         let ident = &self.ident;
-        quote! { #ident, }
+        let variable_ident = &self.variable_ident;
+
+        quote! { #ident: #variable_ident, }
     }
 }
