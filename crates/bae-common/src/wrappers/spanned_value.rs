@@ -13,6 +13,7 @@ use crate::{
 ///
 /// This is especially useful with the `BaeParse` impls for String, integers and other non-`syn` types
 /// that do not store `span`s.
+#[derive(Clone)]
 pub struct SpannedValue<T>
 where
     T: BaeParse,

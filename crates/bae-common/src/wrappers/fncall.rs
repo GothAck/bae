@@ -9,7 +9,6 @@ use crate::{
     BaeDefault, BaeDefaultedValue, BaeParse, BaeParseCtx, BaeParseResult, BaeSpanned,
 };
 
-#[derive(Debug)]
 /// Wrap a tuple of a bunch of types in this to make your attribute argument "callable", with fixed type arguments, instead of assignable.
 ///
 /// For example:
@@ -42,14 +41,13 @@ use crate::{
 /// # assert_eq!(my_callable.4.to_token_stream().to_string(), "(9 , \"hello\" , 3.14 , \"world\")");
 /// # assert!(attr.other.is_some());
 /// ```
+#[derive(Debug, Clone)]
 pub struct FnCallFixed<T>
 where
     T: Sized,
 {
     inner: T,
 }
-
-#[derive(Debug)]
 
 /// Supply one type to this and receive a callable attribute argument with varying argument count.
 ///
@@ -85,6 +83,7 @@ where
 /// # assert_eq!(attr.my_callable[7].value(), "!");
 /// # assert!(attr.other.is_some());
 /// ```
+#[derive(Debug, Clone)]
 pub struct FnCallVarArgs<T>
 where
     T: Sized,
