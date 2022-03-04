@@ -1,4 +1,4 @@
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
@@ -6,6 +6,9 @@ use syn::{
 };
 
 use syn::{Error, LitFloat, LitInt, LitStr};
+
+/// Result of a `BaeParse::bae_parse*` call
+pub type BaeParseResult<T> = Result<BaeSpanned<T>>;
 
 /// Parsing interface implemented by all types that can be parsed in a default way by a `FromAttribute` implementation.
 ///
@@ -26,16 +29,16 @@ where
     Self: Sized,
 {
     /// Parse the `input` ParseStream
-    fn parse(input: ParseStream) -> Result<Self>;
+    fn parse(input: ParseStream) -> BaeParseResult<Self>;
 
     /// Parse the `input` `ParseStream` with (by default) `=` prefix
-    fn parse_prefix(input: ParseStream) -> Result<Self> {
+    fn parse_prefix(input: ParseStream) -> BaeParseResult<Self> {
         input.parse::<syn::Token![=]>()?;
         <Self as BaeParse>::parse(input)
     }
 
     /// Parse the `input` `ParseStream` like a function argument (e.g. for `Option<u8>` take ident("None") to be None, and Some("123") to be Some(LitStr("123")))
-    fn parse_fn_arg(input: ParseStream) -> Result<Self> {
+    fn parse_fn_arg(input: ParseStream) -> BaeParseResult<Self> {
         <Self as BaeParse>::parse(input)
     }
 }
@@ -57,29 +60,32 @@ where
     Self: BaeParseVia,
     <Self as BaeParseVia>::Via: BaeParse,
 {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let via = <<Self as BaeParseVia>::Via as BaeParse>::parse(input)?;
-        <Self as BaeParseVia>::try_via(via)
+    fn parse(input: ParseStream) -> BaeParseResult<Self> {
+        <<Self as BaeParseVia>::Via as BaeParse>::parse(input)?
+            .map(<Self as BaeParseVia>::try_via)
+            .transpose()
     }
 
-    fn parse_prefix(input: ParseStream) -> Result<Self> {
-        let via = <<Self as BaeParseVia>::Via as BaeParse>::parse_prefix(input)?;
-        <Self as BaeParseVia>::try_via(via)
+    fn parse_prefix(input: ParseStream) -> BaeParseResult<Self> {
+        <<Self as BaeParseVia>::Via as BaeParse>::parse_prefix(input)?
+            .map(<Self as BaeParseVia>::try_via)
+            .transpose()
     }
 
-    fn parse_fn_arg(input: ParseStream) -> Result<Self> {
-        let via = <<Self as BaeParseVia>::Via as BaeParse>::parse_fn_arg(input)?;
-        <Self as BaeParseVia>::try_via(via)
+    fn parse_fn_arg(input: ParseStream) -> BaeParseResult<Self> {
+        <<Self as BaeParseVia>::Via as BaeParse>::parse_fn_arg(input)?
+            .map(<Self as BaeParseVia>::try_via)
+            .transpose()
     }
 }
 
 impl BaeParse for () {
-    fn parse(_input: ParseStream) -> Result<Self> {
-        Ok(())
+    fn parse(_input: ParseStream) -> BaeParseResult<Self> {
+        Ok(BaeSpanned::new((), None))
     }
 
-    fn parse_prefix(_input: ParseStream) -> Result<Self> {
-        Ok(())
+    fn parse_prefix(input: ParseStream) -> BaeParseResult<Self> {
+        Self::parse(input)
     }
 }
 
@@ -87,23 +93,23 @@ impl<T> BaeParse for Option<T>
 where
     T: BaeParse,
 {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Some(<T as BaeParse>::parse(input)?))
+    fn parse(input: ParseStream) -> BaeParseResult<Self> {
+        Ok(<T as BaeParse>::parse(input)?.map(|v| Some(v)))
     }
 
-    fn parse_prefix(input: ParseStream) -> Result<Self> {
-        Ok(Some(<T as BaeParse>::parse_prefix(input)?))
+    fn parse_prefix(input: ParseStream) -> BaeParseResult<Self> {
+        Ok(<T as BaeParse>::parse_prefix(input)?.map(|v| Some(v)))
     }
 
-    fn parse_fn_arg(input: ParseStream) -> Result<Self> {
+    fn parse_fn_arg(input: ParseStream) -> BaeParseResult<Self> {
         let variant_name = input.parse::<Ident>()?;
         match variant_name.to_string().as_str() {
-            "None" => Ok(None),
+            "None" => Ok(BaeSpanned::new(None, Some(variant_name.span()))),
             "Some" => {
                 let content;
                 syn::parenthesized!(content in input);
-                let inner = T::parse_fn_arg(&content)?;
-                Ok(Some(inner))
+                let inner = T::parse_fn_arg(&content)?.map(|v| Some(v));
+                Ok(inner)
             }
             _ => Err(Error::new(input.span(), "Invalid Option variant")),
         }
@@ -124,8 +130,10 @@ macro_rules! impl_bae_parse_syn_type {
         where
             Self: Parse + BaeSupportedSynType,
         {
-            fn parse(input: ParseStream) -> Result<Self> {
-                <Self as Parse>::parse(input)
+            fn parse(input: ParseStream) -> BaeParseResult<Self> {
+                let inner = <Self as Parse>::parse(input)?;
+
+                Ok(BaeSpanned::from(inner))
             }
         }
     };
@@ -164,3 +172,84 @@ macro_rules! impl_bae_parse_via_float_types {
 }
 
 impl_bae_parse_via_float_types!(f32, f64);
+
+/// A "Spanned" value - the result of `BaeParse::bae_parse`
+pub struct BaeSpanned<T> {
+    inner: T,
+    span: Option<Span>,
+}
+
+impl<T> BaeSpanned<T> {
+    /// Create a new `BaeSpanned<T>` with optional `Span`
+    pub fn new(inner: T, span: Option<Span>) -> Self {
+        Self { inner, span }
+    }
+
+    /// Create a new `BaeSpanned<T>` with `Span` from `syn::spanned::Spanned` inner
+    pub fn from(inner: T) -> Self
+    where
+        T: Spanned,
+    {
+        let span = Some(inner.span());
+
+        Self { inner, span }
+    }
+
+    /// Unwrap the inner value
+    pub fn unwrap(self) -> T {
+        self.inner
+    }
+
+    /// Unwrap the inner value and the `Span`
+    pub fn unwrap_with_span(self) -> (T, Option<Span>) {
+        (self.inner, self.span)
+    }
+
+    /// Retrieve the `Span`
+    pub fn span(&self) -> Option<Span> {
+        self.span
+    }
+
+    /// Map this `BaeSpanned`, creating a new `BaeSpanned` with inner being the return value of the mapper function
+    pub fn map<U, F>(self, f: F) -> BaeSpanned<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let inner = f(self.inner);
+        let span = self.span;
+
+        BaeSpanned { inner, span }
+    }
+
+    /// Map this `BaeSpanned`, creating a new `BaeSpanned` with inner being the return value of the mapper function
+    pub fn map_with_span<U, F>(self, f: F) -> BaeSpanned<U>
+    where
+        F: FnOnce(T, Option<Span>) -> U,
+    {
+        let span = self.span;
+        let inner = f(self.inner, span);
+
+        BaeSpanned { inner, span }
+    }
+
+    /// Convert this `BaeSpanned` into a `BaeSpanned` containing a reference to the original's value
+    pub fn as_ref(&self) -> BaeSpanned<&T> {
+        BaeSpanned {
+            inner: &self.inner,
+            span: self.span,
+        }
+    }
+}
+
+impl<T, E> BaeSpanned<std::result::Result<T, E>> {
+    /// Convert `BaeSpanned<Result<T, E>>` into `Result<BaeSpanned<T>, E>`
+    pub fn transpose(self) -> std::result::Result<BaeSpanned<T>, E> {
+        match self.inner {
+            Ok(inner) => Ok(BaeSpanned {
+                inner,
+                span: self.span,
+            }),
+            Err(e) => Err(e),
+        }
+    }
+}

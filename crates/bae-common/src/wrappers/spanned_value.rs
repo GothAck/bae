@@ -1,12 +1,12 @@
 use std::{fmt, ops::Deref};
 
 use proc_macro2::Span;
-use syn::{parse::ParseStream, spanned::Spanned, Result};
+use syn::parse::ParseStream;
 
 use crate::{
     parse::{BaeParse, BaeParseVia},
     types_support::{BaeSupportedAllType, BaeSupportedOtherType, BaeSupportedTypeBunked},
-    BaeDefault, BaeDefaultedValue,
+    BaeDefault, BaeDefaultedValue, BaeParseResult,
 };
 
 /// Wrap a type in this (at the root of the type hiererchy), and you get a deref-able and as_ref-able
@@ -22,7 +22,7 @@ where
     T: BaeParseVia,
 {
     inner: T,
-    span: Span,
+    span: Option<Span>,
 }
 
 impl<T> fmt::Debug for SpannedValue<T>
@@ -42,30 +42,12 @@ where
     T: BaeParseVia,
     <T as BaeParseVia>::Via: BaeParse,
 {
-    fn parse_with_inner_parser<
-        Fp: FnOnce(ParseStream) -> Result<<T as BaeParseVia>::Via>,
-        Ft: FnOnce(<T as BaeParseVia>::Via) -> Result<T>,
-    >(
-        input: ParseStream,
-        parser: Fp,
-        try_via: Ft,
-    ) -> Result<Self> {
-        let inner = parser(input)?;
-        let span_start = inner.span();
-        let inner = try_via(inner)?;
-
-        Ok(Self {
-            inner,
-            span: span_start,
-        })
+    fn new(inner: T, span: Option<Span>) -> Self {
+        Self { inner, span }
     }
-}
 
-impl<T> Spanned for SpannedValue<T>
-where
-    T: BaeParseVia,
-{
-    fn span(&self) -> Span {
+    /// Get the `Span` associated with the parsed content, if applicable.
+    pub fn span(&self) -> Option<Span> {
         self.span
     }
 }
@@ -96,34 +78,23 @@ where
     T: BaeParseVia + BaeParse,
     <T as BaeParseVia>::Via: BaeParse,
 {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Self::parse_with_inner_parser(
-            input,
-            <<T as BaeParseVia>::Via as BaeParse>::parse,
-            <T as BaeParseVia>::try_via,
-        )
+    fn parse(input: ParseStream) -> BaeParseResult<Self> {
+        Ok(<T as BaeParse>::parse(input)?.map_with_span(Self::new))
     }
 
-    fn parse_prefix(input: ParseStream) -> Result<Self> {
-        Self::parse_with_inner_parser(
-            input,
-            <<T as BaeParseVia>::Via as BaeParse>::parse_prefix,
-            <T as BaeParseVia>::try_via,
-        )
+    fn parse_prefix(input: ParseStream) -> BaeParseResult<Self> {
+        Ok(<T as BaeParse>::parse_prefix(input)?.map_with_span(Self::new))
     }
 
-    fn parse_fn_arg(input: ParseStream) -> Result<Self> {
-        Self::parse_with_inner_parser(
-            input,
-            <<T as BaeParseVia>::Via as BaeParse>::parse_fn_arg,
-            <T as BaeParseVia>::try_via,
-        )
+    fn parse_fn_arg(input: ParseStream) -> BaeParseResult<Self> {
+        Ok(<T as BaeParse>::parse_fn_arg(input)?.map_with_span(Self::new))
     }
 }
 
 impl<T> BaeDefault for SpannedValue<T>
 where
-    T: BaeDefault + BaeParseVia,
+    T: BaeParseVia + BaeDefault,
+    <T as BaeParseVia>::Via: BaeParse,
 {
     fn bae_default() -> BaeDefaultedValue<Self> {
         use BaeDefaultedValue::*;
@@ -134,10 +105,7 @@ where
             return NoDefault;
         };
 
-        BaeDefaultedValue::Default(Self {
-            inner,
-            span: Span::call_site(),
-        })
+        Default(Self::new(inner, None))
     }
 }
 

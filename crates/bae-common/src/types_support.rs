@@ -1,9 +1,6 @@
 //! Types supported by `bae`'s `BaeParser` trait
 
-use syn::{
-    parse::{Parse, ParseStream},
-    Result,
-};
+use syn::parse::{Parse, ParseStream};
 
 use syn::{
     BinOp, Expr, ExprArray, ExprAssign, ExprAssignOp, ExprBinary, ExprCall, ExprCast, ExprClosure,
@@ -15,7 +12,7 @@ use syn::{
     UnOp, Visibility,
 };
 
-use crate::{parse::impl_bae_parse_syn_type, BaeDefault, BaeParse};
+use crate::{parse::impl_bae_parse_syn_type, BaeDefault, BaeParse, BaeParseResult, BaeSpanned};
 
 /// Implemented for `syn` types `bae` supports parsing
 pub trait BaeSupportedSynType {}

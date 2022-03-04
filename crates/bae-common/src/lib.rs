@@ -23,7 +23,7 @@ mod wrappers;
 
 pub use self::{
     default::{BaeDefault, BaeDefaultedValue},
-    parse::{BaeParse, BaeParseVia},
+    parse::{BaeParse, BaeParseResult, BaeParseVia, BaeSpanned},
     wrappers::{
         fncall::{FnCallFixed, FnCallVarArgs},
         spanned_value::SpannedValue,

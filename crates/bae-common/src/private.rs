@@ -16,7 +16,7 @@ pub mod prelude {
 
     pub use crate::{
         private::{from_attributes_meta, IterCombineSynErrors},
-        BaeDefault, BaeDefaultedValue, BaeParse,
+        BaeDefault, BaeDefaultedValue, BaeParse, BaeSpanned,
     };
 }
 

@@ -299,7 +299,7 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
                     ));
                 }
 
-                #variable_ident = Some(<_ as BaeParse>::parse_prefix(&content)?);
+                #variable_ident = Some(<_ as BaeParse>::parse_prefix(&content)?.unwrap());
             }
         })
     }
