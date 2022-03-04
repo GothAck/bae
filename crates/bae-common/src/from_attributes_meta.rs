@@ -60,7 +60,7 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
             .fields
             .iter()
             .map(|field| {
-                let field = FromAttributesFieldMeta::new(field, &attr_name, &bae_path)?;
+                let field = FromAttributesFieldMeta::new(field, &attr_name)?;
                 Ok((field.ident.clone(), field))
             })
             .collect::<Result<IndexMap<_, _>>>()?;
@@ -98,16 +98,14 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
         let code = quote! {
             impl #bae_path::FromAttributes for #struct_name {
                 fn try_from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Option<Self>> {
-                    use ::syn::spanned::Spanned;
-                    use ::proc_macro2::Span;
-                    use #bae_path::private::IterCombineSynErrors;
+                    use #bae_path::private::prelude::*;
 
                     let attrs = attrs
                         .iter()
                         .filter_map(|attr| match attr.path.get_ident() {
                             Some(ident) if ident == #attr_name => {
                                 Some(
-                                    ::syn::parse2::<Self>(attr.tokens.clone())
+                                    parse2::<Self>(attr.tokens.clone())
                                         .map(|parsed| (parsed, attr.span()))
                                 )
                             },
@@ -118,7 +116,7 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
                     attrs
                         .into_iter()
                         .fold(Ok(None), |accum, (attr, span)| {
-                            let error_new = || syn::Error::new(
+                            let error_new = || Error::new(
                                 span,
                                 &format!("duplicate attribute `#[{}]`", #attr_name),
                             );
@@ -135,11 +133,13 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
                 }
 
                 fn from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self> {
+                    use #bae_path::private::prelude::*;
+
                     if let Some(attr) = Self::try_from_attributes(attrs)? {
                         Ok(attr)
                     } else {
-                        Err(syn::Error::new(
-                            proc_macro2::Span::call_site(),
+                        Err(Error::new(
+                            Span::call_site(),
                             &format!("missing attribute `#[{}]`", #attr_name),
                         ))
                     }
@@ -151,6 +151,7 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
 
     fn expand_parse_impl(&mut self) {
         let struct_name = self.struct_name();
+        let bae_path = &self.bae_path;
         let attr_name = &self.attr_name;
 
         let variable_declarations = self
@@ -185,20 +186,27 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
             impl syn::parse::Parse for #struct_name {
                 #[allow(unreachable_code, unused_imports, unused_variables)]
                 fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+                    use #bae_path::private::prelude::*;
+
                     #(#variable_declarations)*
 
                     let content;
-                    syn::parenthesized!(content in input);
-                    let content_span = content.span();
+                    parenthesized!(content in input);
+
+                    let content_span = {
+                        let fork = content.fork();
+                        let ts: TokenStream = fork.parse()?;
+                        ts.span()
+                    };
 
                     while !content.is_empty() {
-                        let bae_attr_ident = content.parse::<syn::Ident>()?;
+                        let bae_attr_ident: Ident = content.parse()?;
 
                         match &*bae_attr_ident.to_string() {
                             #(#match_arms)*
                             other => {
-                                return syn::Result::Err(
-                                    syn::Error::new(
+                                return Err(
+                                    Error::new(
                                         bae_attr_ident.span(),
                                         &format!(
                                             "`#[{}]` got unknown `{}` argument. Supported arguments are {}",
@@ -211,12 +219,12 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
                             }
                         }
 
-                        content.parse::<syn::Token![,]>().ok();
+                        content.parse::<Token![,]>().ok();
                     }
 
                     #(#unwrap_mandatory_fields)*
 
-                    syn::Result::Ok(Self { #(#set_fields)* })
+                    Ok(Self { #(#set_fields)* })
                 }
             }
         };
@@ -228,7 +236,6 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
 struct FromAttributesFieldMeta<FieldData: FromAttributesFieldData> {
     field: Field,
     attr_name: LitStr,
-    bae_path: Path,
     data: FieldData,
     ident: Ident,
     variable_ident: Ident,
@@ -236,7 +243,7 @@ struct FromAttributesFieldMeta<FieldData: FromAttributesFieldData> {
 }
 
 impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
-    fn new(field: &Field, attr_name: &LitStr, bae_path: &Path) -> Result<Self> {
+    fn new(field: &Field, attr_name: &LitStr) -> Result<Self> {
         let data = FieldData::new(&field.attrs)?;
 
         let ident = field
@@ -256,7 +263,6 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
         Ok(Self {
             field: field.clone(),
             attr_name: attr_name.clone(),
-            bae_path: bae_path.clone(),
             data,
             ident,
             variable_ident,
@@ -271,7 +277,7 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
 
         let variable_ident = &self.variable_ident;
         let ty = &self.field.ty;
-        Some(quote! { let mut #variable_ident: Option<#ty> = std::option::Option::None; })
+        Some(quote! { let mut #variable_ident: Option<#ty> = None; })
     }
 
     fn expand_match_arms(&self) -> Option<TokenStream> {
@@ -283,18 +289,17 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
         let pattern = &self.field_name;
         let attr_name = &self.attr_name;
         let field_name = &self.field_name;
-        let bae_path = &self.bae_path;
 
         Some(quote! {
             #pattern => {
                 if #variable_ident.is_some() {
-                    return Err(::syn::Error::new(
+                    return Err(Error::new(
                         content_span,
                         &format!("`#[{}]` argument `{}` specified multiple times", #attr_name, #field_name),
                     ));
                 }
 
-                #variable_ident = Some(<_ as #bae_path::BaeParse>::parse_prefix(&content)?);
+                #variable_ident = Some(<_ as BaeParse>::parse_prefix(&content)?);
             }
         })
     }
@@ -308,25 +313,24 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
             let default = self
                 .data
                 .default()
-                .unwrap_or_else(|| quote! { ::std::default::Default::default });
+                .unwrap_or_else(|| quote! { Default::default });
 
             quote! {
                 let #variable_ident: #ty = #default();
             }
         } else {
-            let bae_path = &self.bae_path;
             let attr_name = &self.attr_name;
             let field_name = &self.field_name;
 
             let default = self
                 .data
                 .default()
-                .map(|default| quote! { #bae_path::BaeDefaultedValue::Default(#default()) })
-                .unwrap_or_else(|| quote! { <_ as #bae_path::BaeDefault>::bae_default() });
+                .map(|default| quote! { BaeDefaultedValue::Default(#default()) })
+                .unwrap_or_else(|| quote! { <_ as BaeDefault>::bae_default() });
 
             quote! {
                 let #variable_ident = #variable_ident
-                    .map(|v| #bae_path::BaeDefaultedValue::Present(v))
+                    .map(|v| BaeDefaultedValue::Present(v))
                     .unwrap_or_else(|| #default)
                     .ok_or_syn_error(
                         content_span,

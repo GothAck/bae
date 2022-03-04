@@ -4,6 +4,22 @@ use syn::Result;
 
 pub use super::from_attributes_meta;
 
+pub mod prelude {
+    pub use std::{
+        default::Default,
+        option::Option::{self, None, Some},
+        result::Result::{Err, Ok},
+    };
+
+    pub use proc_macro2::{Span, TokenStream};
+    pub use syn::{parenthesized, parse2, spanned::Spanned, Error, Ident, Result, Token};
+
+    pub use crate::{
+        private::{from_attributes_meta, IterCombineSynErrors},
+        BaeDefault, BaeDefaultedValue, BaeParse,
+    };
+}
+
 /// Collect all `syn::Result` in this iterator, combining all `syn::Error`
 pub trait IterCombineSynErrors<T, I>
 where
