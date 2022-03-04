@@ -1,11 +1,7 @@
-mod util;
-
-use bae::FromAttributes;
+use bae::{test_utils::parse_attrs, FromAttributes};
 use proc_macro2::Span;
 use quote::quote;
 use syn::{LitInt, LitStr};
-
-use self::util::parse_attrs;
 
 #[derive(FromAttributes)]
 #[bae(name = test_attr)]

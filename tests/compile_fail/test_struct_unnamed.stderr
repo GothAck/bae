@@ -1,0 +1,24 @@
+error: Field without a name
+ --> tests/compile_fail/test_struct_unnamed.rs:7:5
+  |
+7 |     LitStr,
+  |     ^^^^^^
+
+error[E0599]: no function or associated item named `from_attributes` found for struct `MyAttr` in the current scope
+  --> tests/compile_fail/test_struct_unnamed.rs:18:24
+   |
+6  | / struct MyAttr(
+7  | |     LitStr,
+8  | |     Option<LitInt>,
+9  | |     Option<LitInt>,
+10 | |     Option<()>,
+11 | |     Option<()>,
+12 | | );
+   | |__- function or associated item `from_attributes` not found for this
+...
+18 |       let attr = MyAttr::from_attributes(&attrs).unwrap();
+   |                          ^^^^^^^^^^^^^^^ function or associated item not found in `MyAttr`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `from_attributes`, perhaps you need to implement it:
+           candidate #1: `FromAttributes`

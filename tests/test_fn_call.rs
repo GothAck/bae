@@ -1,10 +1,6 @@
-mod util;
-
-use bae::{FnCallFixed, FnCallVarArgs, FromAttributes};
+use bae::{test_utils::parse_attrs, FnCallFixed, FnCallVarArgs, FromAttributes};
 use quote::{quote, ToTokens};
 use syn::{Expr, ExprCall, ExprLit, ExprPath, Lit, LitInt, LitStr, Path};
-
-use self::util::parse_attrs;
 
 #[derive(FromAttributes, Debug)]
 struct MyAttrFixed {

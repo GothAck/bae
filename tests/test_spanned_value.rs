@@ -1,12 +1,11 @@
 #![cfg(feature = "span-locations")]
 
-mod util;
-
-use bae::{FnCallFixed, FromAttributes, SpannedValue};
+use bae::{
+    test_utils::{parse_attrs_str, slice_str_from_span},
+    FnCallFixed, FromAttributes, SpannedValue,
+};
 use quote::ToTokens;
 use syn::{ExprPath, LitInt, LitStr};
-
-use self::util::{parse_attrs_str, slice_str_from_span};
 
 #[derive(FromAttributes, Debug)]
 struct MyAttr {

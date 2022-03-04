@@ -13,7 +13,7 @@ repository = "https://github.com/davidpdrsn/bae.git"
 version = "0.1.7"
 
 [features]
-span-locations = ["proc-macro2/span-locations"]
+span-locations = ["proc-macro2/span-locations", "bae-common/span-locations"]
 
 [dependencies]
 bae-common = { version = "0.1.7", path = "crates/bae-common" }

@@ -1,10 +1,6 @@
-mod util;
-
-use bae::FromAttributes;
+use bae::{test_utils::parse_attrs, FromAttributes};
 use quote::{quote, ToTokens};
 use syn::{ExprCall, ExprPath};
-
-use self::util::parse_attrs;
 
 #[derive(FromAttributes, Debug)]
 struct MyAttr {

@@ -1,10 +1,6 @@
-mod util;
-
-use bae::FromAttributes;
+use bae::{test_utils::parse_attrs, FromAttributes};
 use quote::quote;
 use syn::{LitInt, LitStr};
-
-use self::util::parse_attrs;
 
 #[allow(dead_code)]
 #[derive(FromAttributes, Debug)]

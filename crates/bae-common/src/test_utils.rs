@@ -1,3 +1,5 @@
+//! Some test utilities for `bae`
+
 #[cfg(feature = "span-locations")]
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -7,21 +9,22 @@ use syn::{
 };
 
 fn attrs_parser(input: ParseStream) -> Result<Vec<Attribute>> {
-    Attribute::parse_outer(&input)
+    Attribute::parse_outer(input)
 }
 
-#[allow(dead_code)]
+/// Parse a `TokenStream` into a `Vec` of `syn::Attribute`
 pub fn parse_attrs(tokens: TokenStream) -> Result<Vec<Attribute>> {
     attrs_parser.parse2(tokens)
 }
 
-#[allow(dead_code)]
+/// Parse a `&str` into a `Vec` of `syn::Attribute`
 pub fn parse_attrs_str(s: &str) -> Result<Vec<Attribute>> {
     attrs_parser.parse_str(s)
 }
 
 #[cfg(feature = "span-locations")]
-#[allow(dead_code)]
+/// Take a parsed `&str` and slice it using `Span::start()` and `Span::end()`,
+/// return the `Span`ned slice of the string
 pub fn slice_str_from_span(s: &str, span: Span) -> &str {
     let start = span.start();
     let end = span.end();
