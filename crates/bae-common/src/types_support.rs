@@ -12,7 +12,9 @@ use syn::{
     UnOp, Visibility,
 };
 
-use crate::{parse::impl_bae_parse_syn_type, BaeDefault, BaeParse, BaeParseResult, BaeSpanned};
+use crate::{
+    parse::impl_bae_parse_syn_type, BaeDefault, BaeParse, BaeParseCtx, BaeParseResult, BaeSpanned,
+};
 
 /// Implemented for `syn` types `bae` supports parsing
 pub trait BaeSupportedSynType {}

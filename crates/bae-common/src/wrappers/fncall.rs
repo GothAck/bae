@@ -6,7 +6,7 @@ use syn::{parse::ParseStream, spanned::Spanned, Error, Result};
 
 use crate::{
     types_support::{BaeSupportedAllType, BaeSupportedOtherType, BaeSupportedTypeBunked},
-    BaeDefault, BaeDefaultedValue, BaeParse, BaeParseResult, BaeSpanned,
+    BaeDefault, BaeDefaultedValue, BaeParse, BaeParseCtx, BaeParseResult, BaeSpanned,
 };
 
 #[derive(Debug)]
@@ -129,7 +129,7 @@ where
 
         let inner = parser(&content)?;
 
-        Ok(BaeSpanned::new(Self { inner }, Some(span)))
+        Ok(BaeSpanned::new(Self { inner }, span))
     }
 }
 
@@ -153,11 +153,7 @@ where
     }
 }
 
-impl<'a, T> Deref for FnCallFixed<T>
-where
-    Self: 'a,
-    T: BaeParse,
-{
+impl<T> Deref for FnCallFixed<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -165,9 +161,8 @@ where
     }
 }
 
-impl<'a, T> Deref for FnCallVarArgs<T>
+impl<T> Deref for FnCallVarArgs<T>
 where
-    Self: 'a,
     T: BaeParse,
 {
     type Target = Vec<T>;
@@ -181,7 +176,7 @@ impl<T> BaeParse for FnCallVarArgs<T>
 where
     T: BaeParse,
 {
-    fn parse(input: ParseStream) -> BaeParseResult<Self> {
+    fn parse(input: ParseStream, ctx: &BaeParseCtx) -> BaeParseResult<Self> {
         let content;
         syn::parenthesized!(content in input);
 
@@ -194,7 +189,7 @@ where
         let mut inner = Vec::new();
 
         while !content.is_empty() {
-            inner.push(<T as BaeParse>::parse_fn_arg(&content)?.unwrap());
+            inner.push(<T as BaeParse>::parse_fn_arg(&content, ctx)?.unwrap());
             if !content.peek(syn::Token![,]) {
                 break;
             }
@@ -205,10 +200,10 @@ where
             return Err(Error::new(input.span(), "Invalid arguments"));
         }
 
-        Ok(BaeSpanned::new(Self { inner }, Some(span)))
+        Ok(BaeSpanned::new(Self { inner }, span))
     }
-    fn parse_prefix(input: ParseStream) -> BaeParseResult<Self> {
-        Self::parse(input)
+    fn parse_prefix(input: ParseStream, ctx: &BaeParseCtx) -> BaeParseResult<Self> {
+        Self::parse(input, ctx)
     }
 }
 
@@ -225,11 +220,11 @@ macro_rules! impl_bae_parse_fn_call_mixed {
                 $x: BaeParse,
             )*
         {
-            fn parse(input: ParseStream) -> BaeParseResult<Self> {
+            fn parse(input: ParseStream, ctx: &BaeParseCtx) -> BaeParseResult<Self> {
                 Self::parse_with_inner_parser(input, &mut |input| -> Result<( $( $x, )* )> {
                     paste! {
                         $(
-                            let [< var_ $x >] = <$x as BaeParse>::parse_fn_arg(input)?.unwrap();
+                            let [< var_ $x >] = <$x as BaeParse>::parse_fn_arg(input, ctx)?.unwrap();
                             if !input.is_empty() {
                                 input.parse::<syn::Token![,]>()?;
                             }
@@ -242,8 +237,8 @@ macro_rules! impl_bae_parse_fn_call_mixed {
                     }
                 })
             }
-            fn parse_prefix(input: ParseStream) -> BaeParseResult<Self> {
-                Self::parse(input)
+            fn parse_prefix(input: ParseStream, ctx: &BaeParseCtx) -> BaeParseResult<Self> {
+                Self::parse(input, ctx)
             }
         }
 

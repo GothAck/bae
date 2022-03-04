@@ -289,6 +289,7 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
         let pattern = &self.field_name;
         let attr_name = &self.attr_name;
         let field_name = &self.field_name;
+        let ty = &self.field.ty;
 
         Some(quote! {
             #pattern => {
@@ -299,7 +300,11 @@ impl<FieldData: FromAttributesFieldData> FromAttributesFieldMeta<FieldData> {
                     ));
                 }
 
-                #variable_ident = Some(<_ as BaeParse>::parse_prefix(&content)?.unwrap());
+                #variable_ident = {
+                    let key_span = bae_attr_ident.span();
+                    let mut bae_spanned = <#ty as BaeParse>::parse_prefix(&content, &bae_attr_ident.into())?;
+                    Some(bae_spanned.unwrap())
+                };
             }
         })
     }

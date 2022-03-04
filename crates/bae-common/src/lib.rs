@@ -17,13 +17,12 @@ pub mod from_attributes_meta;
 mod parse;
 #[doc(hidden)]
 pub mod private;
-
 pub mod types_support;
 mod wrappers;
 
 pub use self::{
     default::{BaeDefault, BaeDefaultedValue},
-    parse::{BaeParse, BaeParseResult, BaeParseVia, BaeSpanned},
+    parse::{BaeParse, BaeParseCtx, BaeParseResult, BaeParseVia, BaeSpanned},
     wrappers::{
         fncall::{FnCallFixed, FnCallVarArgs},
         spanned_value::SpannedValue,

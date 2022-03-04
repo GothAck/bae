@@ -16,9 +16,11 @@ pub mod prelude {
 
     pub use crate::{
         private::{from_attributes_meta, IterCombineSynErrors},
-        BaeDefault, BaeDefaultedValue, BaeParse, BaeSpanned,
+        BaeDefault, BaeDefaultedValue, BaeParse, BaeParseCtx, BaeSpanned,
     };
 }
+
+pub type BaeSpannedResult<T> = Result<crate::BaeSpanned<T>>;
 
 /// Collect all `syn::Result` in this iterator, combining all `syn::Error`
 pub trait IterCombineSynErrors<T, I>

@@ -12,6 +12,9 @@ readme = "README.md"
 repository = "https://github.com/davidpdrsn/bae.git"
 version = "0.1.7"
 
+[features]
+span-locations = ["proc-macro2/span-locations"]
+
 [dependencies]
 bae-common = { version = "0.1.7", path = "crates/bae-common" }
 bae-derive = { version = "0.1.7", path = "crates/bae-derive" }
@@ -25,5 +28,10 @@ trybuild = "1"
 
 [lib]
 path = "src/lib.rs"
+
+[[test]]
+name = "test_spanned_value"
+path = "tests/test_spanned_value.rs"
+required-features = ["span-locations"]
 
 [workspace]
