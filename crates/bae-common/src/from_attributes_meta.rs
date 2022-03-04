@@ -96,8 +96,8 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
         let attr_name = &self.attr_name;
 
         let code = quote! {
-            impl #struct_name {
-                pub fn try_from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Option<Self>> {
+            impl #bae_path::FromAttributes for #struct_name {
+                fn try_from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Option<Self>> {
                     use ::syn::spanned::Spanned;
                     use ::proc_macro2::Span;
                     use #bae_path::private::IterCombineSynErrors;
@@ -134,7 +134,7 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
                         })
                 }
 
-                pub fn from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self> {
+                fn from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self> {
                     if let Some(attr) = Self::try_from_attributes(attrs)? {
                         Ok(attr)
                     } else {

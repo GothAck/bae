@@ -29,3 +29,25 @@ pub use self::{
         spanned_value::SpannedValue,
     },
 };
+
+/// See root module docs for more info.
+pub trait FromAttributes
+where
+    Self: Sized,
+{
+    /// Try to parse `syn::Attribute`s into `Self`.
+    ///
+    /// Returns:
+    ///     Err(syn::Error) - on attribute parsing error.
+    ///     Ok(None)        - when none of the `syn::Attribute`s match this attribute's name.
+    ///     Ok(Some(Self))  - when one of the `syn::Attribute`s match this attribute's name.
+    fn try_from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Option<Self>>;
+
+    /// Parse `syn::Attribute`s into `Self`.
+    ///
+    /// Returns:
+    ///     Err(syn::Error) - on attribute parsing error, or none of the `syn::Attribute`s
+    ///                       match this attribute's name.
+    ///     Ok(Self)        - when one of the `syn::Attribute`s match this attribute's name.
+    fn from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self>;
+}

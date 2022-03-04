@@ -23,21 +23,20 @@ where
     where
         B: Default,
     {
-        let res_vec =
-            self.fold::<Result<Vec<T>>, _>(Ok(Default::default()), |accum, res| {
-                match (accum, res) {
-                    (Err(mut ea), Err(er)) => {
-                        ea.combine(er);
-                        Err(ea)
-                    }
-                    (Err(ea), Ok(_)) => Err(ea),
-                    (Ok(_), Err(er)) => Err(er),
-                    (Ok(mut va), Ok(vr)) => {
-                        va.push(vr);
-                        Ok(va)
-                    }
+        let res_vec = self.fold::<Result<Vec<T>>, _>(Ok(Default::default()), |accum, res| {
+            match (accum, res) {
+                (Err(mut ea), Err(er)) => {
+                    ea.combine(er);
+                    Err(ea)
                 }
-            });
+                (Err(ea), Ok(_)) => Err(ea),
+                (Ok(_), Err(er)) => Err(er),
+                (Ok(mut va), Ok(vr)) => {
+                    va.push(vr);
+                    Ok(va)
+                }
+            }
+        });
 
         res_vec.map(|vec| B::from_iter(vec))
     }

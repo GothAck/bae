@@ -16,8 +16,11 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Attribute, ItemStruct, Result};
 
-use bae_common::from_attributes_meta::{
-    FromAttributesData, FromAttributesFieldData, FromAttributesMeta,
+use bae_common::{
+    from_attributes_meta::{
+        FromAttributesData, FromAttributesFieldData, FromAttributesMeta,
+    },
+    FromAttributes,
 };
 
 /// See root module docs for more info.

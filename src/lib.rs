@@ -105,8 +105,8 @@
 pub use bae_derive::FromAttributes;
 
 pub use bae_common::{
-    private, types_support, BaeDefault, BaeDefaultedValue, BaeParse, BaeParseVia, FnCallFixed, FnCallVarArgs,
-    SpannedValue,
+    private, types_support, BaeDefault, BaeDefaultedValue, BaeParse, BaeParseVia, FnCallFixed,
+    FnCallVarArgs, FromAttributes, SpannedValue,
 };
 
 #[cfg(test)]
