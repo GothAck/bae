@@ -1,5 +1,6 @@
 use std::iter::FromIterator;
 
+pub use syn;
 use syn::Result;
 
 pub use super::from_attributes_meta;

@@ -97,7 +97,7 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
 
         let code = quote! {
             impl #bae_path::FromAttributes for #struct_name {
-                fn try_from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Option<Self>> {
+                fn try_from_attributes(attrs: &[#bae_path::private::syn::Attribute]) -> #bae_path::private::syn::Result<Option<Self>> {
                     use #bae_path::private::prelude::*;
 
                     let attrs = attrs
@@ -132,7 +132,7 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
                         })
                 }
 
-                fn from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self> {
+                fn from_attributes(attrs: &[#bae_path::private::syn::Attribute]) -> #bae_path::private::syn::Result<Self> {
                     use #bae_path::private::prelude::*;
 
                     if let Some(attr) = Self::try_from_attributes(attrs)? {
@@ -183,9 +183,9 @@ impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON:
         let supported_args = supported_args.join(", ");
 
         let code = quote! {
-            impl syn::parse::Parse for #struct_name {
+            impl #bae_path::private::syn::parse::Parse for #struct_name {
                 #[allow(unreachable_code, unused_imports, unused_variables)]
-                fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+                fn parse(input: #bae_path::private::syn::parse::ParseStream) -> #bae_path::private::syn::Result<Self> {
                     use #bae_path::private::prelude::*;
 
                     #(#variable_declarations)*
