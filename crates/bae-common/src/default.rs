@@ -62,7 +62,7 @@ impl_bae_default_no_default!(
     String, u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64
 );
 
-/// Result of a `BaeDefault::bae_default()` call, mappable to `Result<T, syn::Error>` using `.ok_or_syn_error(Span, impl Display)`
+/// Result of a `BaeDefault::bae_default()` call, mappable to [`Result<T, syn::Error>`] using [`BaeDefaultedValue::ok_or_syn_error()`]
 pub enum BaeDefaultedValue<T>
 where
     T: Sized,
@@ -76,8 +76,8 @@ where
 }
 
 impl<T> BaeDefaultedValue<T> {
-    /// Transforms the `BaeDefaultResult<T>` into a `Result<T, syn::Error>`,
-    /// mapping Some(v) to Ok(v) and None to Err(syn::Error(span, msg)).
+    /// Transforms the[ `BaeDefaultedValue<T>`] into a [`Result<T, syn::Error>`],
+    /// mapping [`Some`] to [`Ok`] and None to `Err(syn::Error())`.
     pub fn ok_or_syn_error<U: Display>(self, span: Span, msg: U) -> Result<T> {
         use BaeDefaultedValue::*;
         match self {

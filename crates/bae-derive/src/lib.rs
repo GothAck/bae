@@ -19,7 +19,7 @@ use syn::{parse_macro_input, ItemStruct, ItemEnum};
 
 use crate::{enum_attribute::EnumAttribute, from_attributes::FromAttributesImpl};
 
-/// See root module docs for more info.
+/// See `bae` root module docs for more info.
 #[proc_macro_derive(FromAttributes, attributes(bae))]
 pub fn from_attributes(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as ItemStruct);

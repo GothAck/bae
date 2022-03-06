@@ -24,5 +24,8 @@ indexmap = "1.8"
 quote = "1"
 heck = "0.4"
 
+[dev-dependencies]
+bae = { version = "0.1.7", path = "../.." }
+
 [lib]
 path = "src/lib.rs"

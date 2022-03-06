@@ -17,9 +17,9 @@ pub type BaeParseResult<T> = Result<BaeSpanned<T>>;
 /// Equivalent to `syn::parse::Parse`, however this is not implemented for every type that implements `syn::parse::Parse` automatically.
 /// This is due to our special case parsing of:
 /// `()`
-///     Used in `Option<()>` switches
+///     Used in `Option<()>` switches - matches zero tokens & doesn't swallow a `=` prefix.
 /// `Option<T> where T: BaeParse`
-///     Used in `Option<()>` switches
+///     Makes an attribute optional.
 /// `String`
 ///     Parses via `syn::LitStr`
 /// `u8`, `u16`, `u32`, `u64`, `u128`, `usize`, `i8`, `i16`, `i32`, `i64`, `i128`, `isize`
@@ -30,16 +30,62 @@ pub trait BaeParse
 where
     Self: Sized,
 {
-    /// Parse the `input` ParseStream
+    /// Parse the `input` [`ParseStream`]
+    ///
+    /// For example:
+    /// ```
+    /// use bae::{test_utils::bae_parse2, BaeParse};
+    /// use quote::quote;
+    ///
+    /// let value: f32 = bae_parse2(
+    ///     quote! { 3.141 },
+    ///     BaeParse::parse,
+    /// ).unwrap();
+    ///
+    /// assert_eq!(value, 3.141);
+    /// ```
     fn parse(input: ParseStream, ctx: &BaeParseCtx) -> BaeParseResult<Self>;
 
-    /// Parse the `input` `ParseStream` with (by default) `=` prefix
+    /// Parse the `input` [`ParseStream`] with (by default) `=` prefix
+    ///
+    /// For example:
+    /// ```
+    /// use bae::{test_utils::bae_parse2, BaeParse};
+    /// use quote::quote;
+    ///
+    /// let value: String = bae_parse2(
+    ///     quote! { = "yay" },
+    ///     BaeParse::parse_prefix,
+    /// ).unwrap();
+    ///
+    /// assert_eq!(value, "yay");
+    /// ```
     fn parse_prefix(input: ParseStream, ctx: &BaeParseCtx) -> BaeParseResult<Self> {
         input.parse::<syn::Token![=]>()?;
         <Self as BaeParse>::parse(input, ctx)
     }
 
-    /// Parse the `input` `ParseStream` like a function argument (e.g. for `Option<u8>` take ident("None") to be None, and Some("123") to be Some(LitStr("123")))
+    /// Parse the `input` [`ParseStream`] like a function argument
+    ///
+    /// For example:
+    /// ```
+    /// use bae::{test_utils::bae_parse2, BaeParse};
+    /// use quote::quote;
+    ///
+    /// let value: Option<u8> = bae_parse2(
+    ///     quote! { Some(123) },
+    ///     BaeParse::parse_fn_arg,
+    /// ).unwrap();
+    ///
+    /// assert_eq!(value, Some(123));
+    ///
+    /// let value: Option<u8> = bae_parse2(
+    ///     quote! { None },
+    ///     BaeParse::parse_fn_arg,
+    /// ).unwrap();
+    ///
+    /// assert_eq!(value, None);
+    /// ```
     fn parse_fn_arg(input: ParseStream, ctx: &BaeParseCtx) -> BaeParseResult<Self> {
         <Self as BaeParse>::parse(input, ctx)
     }
@@ -175,7 +221,7 @@ macro_rules! impl_bae_parse_via_float_types {
 
 impl_bae_parse_via_float_types!(f32, f64);
 
-/// Context passed into `BaeParse::parse*` methods
+/// Context passed into [`BaeParse::parse()`] methods
 pub struct BaeParseCtx {
     attr_ident_span: Span,
 }
@@ -208,19 +254,19 @@ impl From<&Ident> for BaeParseCtx {
     }
 }
 
-/// A "Spanned" value - the result of `BaeParse::parse`
+/// A "Spanned" value - the result of [`BaeParse::parse()`]
 pub struct BaeSpanned<T> {
     inner: T,
     span: Span,
 }
 
 impl<T> BaeSpanned<T> {
-    /// Create a new `BaeSpanned<T>` with optional `Span`
+    /// Create a new [`BaeSpanned<T>`] with optional [`Span`]
     pub fn new(inner: T, span: Span) -> Self {
         Self { inner, span }
     }
 
-    /// Create a new `BaeSpanned<T>` with `Span` from `syn::spanned::Spanned` inner
+    /// Create a new [`BaeSpanned<T>`] with [`Span`] from [`syn::spanned::Spanned`] inner
     pub fn from(inner: T) -> Self
     where
         T: Spanned,
@@ -235,17 +281,17 @@ impl<T> BaeSpanned<T> {
         self.inner
     }
 
-    /// Unwrap the inner value and the `Span`
+    /// Unwrap the inner value and the [`Span`]
     pub fn unwrap_with_span(self) -> (T, Span) {
         (self.inner, self.span)
     }
 
-    /// Retrieve the `Span`
+    /// Retrieve the [`Span`]
     pub fn span(&self) -> Span {
         self.span
     }
 
-    /// Map this `BaeSpanned`, creating a new `BaeSpanned` with inner being the return value of the mapper function
+    /// Map this [`BaeSpanned`], creating a new [`BaeSpanned`] with inner being the return value of the mapper function
     pub fn map<U, F>(self, f: F) -> BaeSpanned<U>
     where
         F: FnOnce(T) -> U,
@@ -256,7 +302,7 @@ impl<T> BaeSpanned<T> {
         BaeSpanned { inner, span }
     }
 
-    /// Map this `BaeSpanned`, creating a new `BaeSpanned` with inner being the return value of the mapper function
+    /// Map this [`BaeSpanned`], creating a new [`BaeSpanned`] with inner being the return value of the mapper function
     pub fn map_with_span<U, F>(self, f: F) -> BaeSpanned<U>
     where
         F: FnOnce(T, Span) -> U,
@@ -267,7 +313,7 @@ impl<T> BaeSpanned<T> {
         BaeSpanned { inner, span }
     }
 
-    /// Convert this `BaeSpanned` into a `BaeSpanned` containing a reference to the original's value
+    /// Convert this [`BaeSpanned`] into a [`BaeSpanned`] containing a reference to the original's value
     pub fn as_ref(&self) -> BaeSpanned<&T> {
         BaeSpanned {
             inner: &self.inner,
@@ -277,7 +323,7 @@ impl<T> BaeSpanned<T> {
 }
 
 impl<T, E> BaeSpanned<std::result::Result<T, E>> {
-    /// Convert `BaeSpanned<Result<T, E>>` into `Result<BaeSpanned<T>, E>`
+    /// Convert [`BaeSpanned<Result<T, E>>`] into [`Result<BaeSpanned<T>, E>`]
     pub fn transpose(self) -> std::result::Result<BaeSpanned<T>, E> {
         match self.inner {
             Ok(inner) => Ok(BaeSpanned {

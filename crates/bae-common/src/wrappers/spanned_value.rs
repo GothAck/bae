@@ -9,10 +9,14 @@ use crate::{
 };
 
 /// Wrap a type in this (at the root of the type hiererchy), and you get a deref-able and as_ref-able
-/// container on which you can also call `.span()` to retrieve the `Span` of the contained value.
+/// container on which you can also call [`SpannedValue::span()`] to retrieve the [`Span`] of the contained value.
 ///
-/// This is especially useful with the `BaeParse` impls for String, integers and other non-`syn` types
-/// that do not store `span`s.
+/// This is especially useful with the [`BaeParse`] impls for String, integers and other non-`syn` types
+/// that do not store [`Span`]s.
+///
+/// Interaction with `Option<T>`:
+/// It's best to use `Option<SpannedValue<T>>`, if you use `SpannedValue<Option<T>>` things will still work, but
+/// the outer `SpannedValue` will have it's [`Span`]s set to [`Span::call_site()`] for missing values.
 #[derive(Clone)]
 pub struct SpannedValue<T>
 where
@@ -47,12 +51,12 @@ where
         }
     }
 
-    /// Get the `Span` associated with the parsed content, if applicable.
+    /// Get the [`Span`] associated with the parsed content, if applicable.
     pub fn span(&self) -> Span {
         self.span
     }
 
-    /// Get the `Span` assiciated with this `SpannedValue`'s key, if applicable.
+    /// Get the [`Span`] assiciated with this [`SpannedValue`]'s key, if applicable.
     pub fn key_span(&self) -> Span {
         self.key_span
     }

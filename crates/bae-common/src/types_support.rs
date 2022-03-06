@@ -1,4 +1,4 @@
-//! Types supported by `bae`'s `BaeParser` trait
+//! Types supported by `bae`'s [`BaeParse`] trait
 
 use syn::parse::{Parse, ParseStream};
 
@@ -22,9 +22,9 @@ pub trait BaeSupportedSynType {}
 pub trait BaeSupportedOtherType {}
 /// Implemented for all types `bae` supports parsing
 pub trait BaeSupportedAllType {}
-/// Implemented for all types that should support `BaeParse` and `BaeDefault`
+/// Implemented for all types that should support [`BaeParse`] and [`BaeDefault`]
 pub trait BaeSupportedTypeChecked: BaeParse + BaeDefault {}
-/// Implemented by types that specifically do not implement both BaeParse + BaeDefault
+/// Implemented by types that specifically do not implement both [`BaeParse`] + [`BaeDefault`]
 pub trait BaeSupportedTypeBunked {}
 
 macro_rules! impl_bae_supported_syn_types {

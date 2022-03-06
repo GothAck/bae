@@ -51,6 +51,8 @@ where
 
 /// Supply one type to this and receive a callable attribute argument with varying argument count.
 ///
+/// Note: there is a limit of 12 arguments, this can be increased with good reasoning.
+///
 /// For example:
 /// ```
 /// # use quote::quote;

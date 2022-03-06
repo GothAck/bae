@@ -23,12 +23,12 @@ pub mod prelude {
 
 pub type BaeSpannedResult<T> = Result<crate::BaeSpanned<T>>;
 
-/// Collect all `syn::Result` in this iterator, combining all `syn::Error`
+/// Collect all [`syn::Result`] in this iterator, combining all [`syn::Error`]
 pub trait IterCombineSynErrors<T, I>
 where
     I: std::iter::Iterator<Item = Result<T>>,
 {
-    /// Collect all `syn::Result` in this iterator, combining all `syn::Error`
+    /// Collect all [`syn::Result`] in this iterator, combining all [`syn::Error`]
     fn collect_syn_error<B: FromIterator<T>>(self) -> Result<B>
     where
         B: Default;
