@@ -10,95 +10,21 @@
     missing_docs
 )]
 
+mod from_attributes;
+
 extern crate proc_macro;
 
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, Attribute, ItemStruct, Result};
+use syn::{parse_macro_input, ItemStruct};
 
-use bae_common::{
-    from_attributes_meta::{
-        FromAttributesData, FromAttributesFieldData, FromAttributesMeta,
-    },
-    FromAttributes,
-};
+use crate::from_attributes::FromAttributesImpl;
 
 /// See root module docs for more info.
 #[proc_macro_derive(FromAttributes, attributes(bae))]
 pub fn from_attributes(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
-    match from_attributes_impl(item) {
+    match FromAttributesImpl::new_and_expand(item) {
         Ok(tokens) => tokens.into(),
         Err(error) => error.into_compile_error().into(),
-    }
-}
-
-fn from_attributes_impl(item: ItemStruct) -> Result<TokenStream> {
-    Ok(FromAttributesMeta::<Data, FieldData, false>::new(item)?.expand())
-}
-
-mod structs {
-    use proc_macro2::Ident;
-
-    use bae_derive_meta::FromAttributesInception;
-
-    #[derive(FromAttributesInception, Debug, Default)]
-    pub struct Bae {
-        pub name: Option<Ident>,
-    }
-}
-
-mod fields {
-    use proc_macro2::Ident;
-
-    use bae_derive_meta::FromAttributesInception;
-    use syn::Path;
-
-    #[derive(FromAttributesInception, Debug, Default)]
-    pub struct Bae {
-        pub name: Option<Ident>,
-        pub skip: Option<()>,
-        pub default: Option<Path>,
-    }
-}
-
-struct Data(structs::Bae);
-
-impl FromAttributesData for Data {
-    fn new(attrs: &[Attribute]) -> Result<Self> {
-        Ok(Data(
-            structs::Bae::try_from_attributes(attrs)?.unwrap_or_default(),
-        ))
-    }
-    fn rename_attr_name(&self, original: String) -> String {
-        self.0
-            .name
-            .as_ref()
-            .map(|name| name.to_string())
-            .unwrap_or(original)
-    }
-}
-
-struct FieldData(fields::Bae);
-
-impl FromAttributesFieldData for FieldData {
-    fn new(attrs: &[Attribute]) -> Result<Self> {
-        Ok(FieldData(
-            fields::Bae::try_from_attributes(attrs)?.unwrap_or_default(),
-        ))
-    }
-    fn rename_field_name(&self, original: String) -> String {
-        self.0
-            .name
-            .as_ref()
-            .map(|name| name.to_string())
-            .unwrap_or(original)
-    }
-    fn skip(&self) -> bool {
-        self.0.skip.is_some()
-    }
-    fn default(&self) -> Option<TokenStream> {
-        self.0.default.as_ref().map(|default| quote! { #default })
     }
 }
 

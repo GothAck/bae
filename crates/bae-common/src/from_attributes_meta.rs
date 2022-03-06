@@ -42,6 +42,10 @@ pub struct FromAttributesMeta<
 impl<Data: FromAttributesData, FieldData: FromAttributesFieldData, const COMMON: bool>
     FromAttributesMeta<Data, FieldData, COMMON>
 {
+    pub fn new_and_expand(item: ItemStruct) -> Result<TokenStream> {
+        Ok(Self::new(item)?.expand())
+    }
+
     pub fn new(item: ItemStruct) -> Result<Self> {
         let bae_path = {
             if COMMON {

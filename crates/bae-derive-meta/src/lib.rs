@@ -5,17 +5,15 @@ use bae_common::from_attributes_meta::{
     FromAttributesData, FromAttributesFieldData, FromAttributesMeta,
 };
 
+type FromAttributesImpl = FromAttributesMeta<Data, FieldData, true>;
+
 #[proc_macro_derive(FromAttributesInception, attributes(bae))]
 pub fn from_attributes_inception(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
-    match from_attributes_inception_impl(item) {
+    match FromAttributesImpl::new_and_expand(item) {
         Ok(tokens) => tokens.into(),
         Err(error) => error.into_compile_error().into(),
     }
-}
-
-fn from_attributes_inception_impl(item: ItemStruct) -> Result<TokenStream> {
-    Ok(FromAttributesMeta::<Data, FieldData, true>::new(item)?.expand())
 }
 
 struct Data;
