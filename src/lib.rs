@@ -104,7 +104,9 @@
 
 pub use bae_derive::{EnumAttribute, FromAttributes};
 
-pub use bae_common::*;
+#[doc(hidden)]
+pub use bae_common::{test_utils, private, BaeDefault, BaeDefaultedValue, BaeParse, BaeParseCtx, BaeParseResult, BaeParseVia, BaeSpanned};
+pub use bae_common::{EnumAttribute, FnCallFixed, FnCallVarArgs, FromAttributes, SpannedValue};
 
 #[cfg(test)]
 mod test {
