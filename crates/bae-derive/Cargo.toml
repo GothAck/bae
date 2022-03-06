@@ -21,6 +21,7 @@ proc-macro2 = "1"
 
 [dev-dependencies]
 trybuild = "1"
+bae = { version = "0.1.7", path = "../.." }
 
 [lib]
 proc-macro = true

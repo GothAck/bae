@@ -10,19 +10,57 @@
     missing_docs
 )]
 
+mod enum_attribute;
 mod from_attributes;
 
 extern crate proc_macro;
 
-use syn::{parse_macro_input, ItemStruct};
+use syn::{parse_macro_input, ItemStruct, ItemEnum};
 
-use crate::from_attributes::FromAttributesImpl;
+use crate::{enum_attribute::EnumAttribute, from_attributes::FromAttributesImpl};
 
 /// See root module docs for more info.
 #[proc_macro_derive(FromAttributes, attributes(bae))]
 pub fn from_attributes(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
     match FromAttributesImpl::new_and_expand(item) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.into_compile_error().into(),
+    }
+}
+
+/// Allows the use of a unit `enum` as an attribute value.
+///
+/// For example:
+/// ```
+/// use bae::{EnumAttribute, FromAttributes};
+/// use bae::test_utils::parse_attrs_str;
+///
+/// #[derive(EnumAttribute)]
+/// enum MyEnum {
+///     First,
+///     Second,
+///     #[bae(skip)]
+///     Skipped
+/// }
+///
+/// #[derive(FromAttributes)]
+/// struct MyAttr {
+///     my_enum: MyEnum,
+/// }
+///
+/// fn main() {
+///     let attr = MyAttr::from_attributes(
+///         &parse_attrs_str("#[my_attr(my_enum = First)]").unwrap()
+///     ).unwrap();
+///
+///     assert!(matches!(attr.my_enum, MyEnum::First));
+/// }
+/// ```
+#[proc_macro_derive(EnumAttribute, attributes(bae))]
+pub fn enum_attribute(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let item = parse_macro_input!(input as ItemEnum);
+    match EnumAttribute::new_and_expand(item) {
         Ok(tokens) => tokens.into(),
         Err(error) => error.into_compile_error().into(),
     }

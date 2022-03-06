@@ -51,3 +51,6 @@ where
     ///     Ok(Self)        - when one of the `syn::Attribute`s match this attribute's name.
     fn from_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self>;
 }
+
+/// TODO
+pub trait EnumAttribute: BaeParse {}

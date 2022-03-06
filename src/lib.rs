@@ -102,7 +102,7 @@
     missing_docs
 )]
 
-pub use bae_derive::FromAttributes;
+pub use bae_derive::{EnumAttribute, FromAttributes};
 
 pub use bae_common::*;
 
